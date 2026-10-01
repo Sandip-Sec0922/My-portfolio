@@ -29,7 +29,7 @@ x-api-common: &api-common
   environment: &api-env
     NODE_ENV: production
     PORT: 5000
-    MONGO_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=${MONGO_DB}
+    MONGO_URI: ${MONGO_URI:-mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=${MONGO_DB}}
     REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET}
     JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}

@@ -35,6 +35,7 @@ module.exports = [
         jest: "readonly",
         beforeAll: "readonly",
         beforeEach: "readonly",
+        afterEach: "readonly",
         describe: "readonly",
         test: "readonly",
         expect: "readonly",

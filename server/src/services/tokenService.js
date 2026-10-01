@@ -10,6 +10,15 @@ const { accessSecret, refreshSecret, issuer, accessTtl, refreshTtlSec } =
   config.jwt;
 const ALGS = ["HS256"]; // allowlist on verify; never trust the token's own "alg" header
 
+async function execChecked(transaction) {
+  const results = await transaction.exec();
+  if (!Array.isArray(results))
+    throw new Error("Redis transaction did not execute");
+  const failure = results.find(([err]) => err)?.[0];
+  if (failure) throw failure;
+  return results;
+}
+
 const signAccess = (user) =>
   jwt.sign({ role: user.role }, accessSecret, {
     algorithm: "HS256",
@@ -40,12 +49,29 @@ async function signRefresh(user) {
     issuer,
     audience: "refresh",
   });
-  await redis
-    .multi()
-    .set(`rt:${jti}`, uid, "EX", refreshTtlSec)
-    .sadd(`user_rt:${uid}`, jti)
-    .expire(`user_rt:${uid}`, refreshTtlSec)
-    .exec();
+  try {
+    await execChecked(
+      redis
+        .multi()
+        .set(`rt:${jti}`, uid, "EX", refreshTtlSec)
+        .sadd(`user_rt:${uid}`, jti)
+        .expire(`user_rt:${uid}`, refreshTtlSec),
+    );
+  } catch (err) {
+    const cleanup = await Promise.allSettled([
+      redis.del(`rt:${jti}`),
+      redis.srem(`user_rt:${uid}`, jti),
+    ]);
+    const cleanupErrors = cleanup
+      .filter((result) => result.status === "rejected")
+      .map((result) => result.reason);
+    if (cleanupErrors.length)
+      throw new AggregateError(
+        [err, ...cleanupErrors],
+        "Refresh session write and cleanup failed",
+      );
+    throw err;
+  }
   return token;
 }
 
@@ -54,7 +80,7 @@ async function revokeAllForUser(uid) {
   const tx = redis.multi();
   jtis.forEach((j) => tx.del(`rt:${j}`));
   tx.del(`user_rt:${uid}`);
-  await tx.exec();
+  await execChecked(tx);
 }
 
 // ROTATION + REUSE DETECTION: each refresh token works exactly once. GET+DEL in one MULTI is atomic,
@@ -71,11 +97,10 @@ async function consumeRefresh(token) {
   } catch {
     throw new AppError(401, "INVALID_TOKEN", "Session expired");
   }
-  const [[, owner]] = await redis
-    .multi()
-    .get(`rt:${claims.jti}`)
-    .del(`rt:${claims.jti}`)
-    .exec();
+  const results = await execChecked(
+    redis.multi().get(`rt:${claims.jti}`).del(`rt:${claims.jti}`),
+  );
+  const owner = results[0][1];
   await redis.srem(`user_rt:${claims.sub}`, claims.jti);
   if (owner !== claims.sub) {
     await revokeAllForUser(claims.sub);
@@ -95,7 +120,9 @@ async function revokeRefresh(token) {
   } catch {
     return;
   }
-  await redis.multi().del(`rt:${c.jti}`).srem(`user_rt:${c.sub}`, c.jti).exec();
+  await execChecked(
+    redis.multi().del(`rt:${c.jti}`).srem(`user_rt:${c.sub}`, c.jti),
+  );
 }
 
 // Logout blacklist. TTL = remaining token lifetime, so the key disappears exactly when the token would expire anyway.

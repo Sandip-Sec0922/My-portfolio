@@ -29,11 +29,15 @@ async function persist(type, ctx, details) {
   // 1) Daily counters in Redis -> public "Security Posture" page (aggregates only, no IPs).
   const day = new Date().toISOString().slice(0, 10);
   const key = `sec:count:${type}:${day}`;
-  await redis
+  const results = await redis
     .multi()
     .incr(key)
     .expire(key, 8 * 86400)
     .exec();
+  if (!Array.isArray(results))
+    throw new Error("Security event counter transaction did not execute");
+  const failure = results.find(([err]) => err)?.[0];
+  if (failure) throw failure;
 
   // 2) Detailed record in Mongo -> admin dashboard. De-duplicated to 1 per IP+type per minute so a
   // flood of blocked requests can't become a database-write DoS. Counters above still count every hit.

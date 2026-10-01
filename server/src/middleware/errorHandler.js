@@ -8,7 +8,6 @@ const notFound = (req, res, next) =>
 
 // Single exit point for errors. WHY: one place guarantees no stack trace, SQL/Mongo message or file
 // path ever reaches a client in production. Full details go to the server log only.
-// eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
 

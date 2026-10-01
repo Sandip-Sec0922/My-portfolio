@@ -12,7 +12,7 @@
 
 name: soc-portfolio
 
-x-api-common: &api-common\
+x-api-common: &api-common
   init: true
   build:
     context: ./server
@@ -68,21 +68,20 @@ services:
   nginx:
     build:
       context: .
-      dockerfile: nginx/Dockerfile
+      dockerfile: Nginx/Dockerfile
       args:
           VITE_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
     restart: unless-stopped
     ports:
       - "80:8080"
-      - "443:8443"
     volumes:
-      - ./nginx/certs:/etc/nginx/certs:ro        # TLS certs, read-only
       - nginx_cache:/var/cache/nginx
     read_only: true
     tmpfs:
       - /tmp:size=16m
       - /var/run:size=1m
     cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID, DAC_OVERRIDE, FOWNER]
     security_opt:
       - no-new-privileges:true
     networks: [frontend, backend]
@@ -136,19 +135,13 @@ services:
       - 128mb
       - --maxmemory-policy
       - allkeys-lru                               # cache evicts, never OOMs the host
-      - --rename-command
-      - FLUSHALL ""                               # disable destructive commands
-      - --rename-command
-      - FLUSHDB ""
-      - --rename-command
-      - CONFIG ""
     environment:
       REDISCLI_AUTH: ${REDIS_PASSWORD}            # lets healthcheck auth without -a flag
     volumes:
       - redis_data:/data
     read_only: true
     cap_drop: [ALL]
-    cap_add: [SETUID, SETGID]                     # needed by the image's entrypoint to drop to redis user
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER] # needed to prepare the data volume
     security_opt:
       - no-new-privileges:true
     networks: [data]

@@ -1,0 +1,20 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "/^Set-Location \\.\\\\server; npm run lint$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^docker compose up --build -d$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^docker compose build nginx$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^docker compose up -d --force-recreate$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}

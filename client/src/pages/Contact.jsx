@@ -1,15 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { api } from "../api/client.js";
 import { usePageTitle } from "../hooks.js";
+import { profile } from "../data/profile.js";
 
-const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY; // public by design
+const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+const empty = { name: "", email: "", subject: "", message: "" };
 
 function Turnstile({ onToken }) {
   const ref = useRef(null);
   useEffect(() => {
     if (!SITE_KEY) return undefined;
     let id;
+    let cancelled = false;
     const mount = () => {
+      if (cancelled || !ref.current || !window.turnstile) return;
       id = window.turnstile.render(ref.current, {
         sitekey: SITE_KEY,
         callback: onToken,
@@ -18,121 +23,150 @@ function Turnstile({ onToken }) {
     };
     if (window.turnstile) mount();
     else {
-      const s = document.createElement("script");
-      s.src =
-        "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-      s.async = true;
-      s.onload = mount;
-      document.head.appendChild(s);
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.onload = mount;
+      document.head.appendChild(script);
     }
     return () => {
+      cancelled = true;
       if (id !== undefined) window.turnstile?.remove(id);
     };
   }, [onToken]);
-  return SITE_KEY ? <div ref={ref} /> : null;
+  return SITE_KEY ? <div ref={ref} aria-label="Human verification" /> : null;
 }
-
-const empty = { name: "", email: "", subject: "", message: "" };
 
 export default function Contact() {
   usePageTitle("Contact");
-  const [f, setF] = useState(empty);
-  const [website, setWebsite] = useState(""); // honeypot
+  const [form, setForm] = useState(empty);
+  const [website, setWebsite] = useState("");
   const [token, setToken] = useState("");
-  const [status, setStatus] = useState({ s: "idle" });
-  const on = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const [status, setStatus] = useState({ state: "idle" });
+  const onToken = useCallback((value) => setToken(value), []);
+  const onChange = (field) => (event) =>
+    setForm((current) => ({ ...current, [field]: event.target.value }));
 
-  async function submit(e) {
-    e.preventDefault();
-    setStatus({ s: "sending" });
+  async function submit(event) {
+    event.preventDefault();
+    setStatus({ state: "sending" });
     try {
       await api.post("/contact", {
-        ...f,
+        ...form,
         website,
         ...(token && { turnstileToken: token }),
       });
-      setF(empty);
-      setStatus({ s: "ok" });
-    } catch (err) {
-      const fields = err.details
-        ?.map((d) => `${d.field}: ${d.message}`)
+      setForm(empty);
+      setToken("");
+      setStatus({ state: "success" });
+    } catch (error) {
+      const fields = error.details
+        ?.map((detail) => `${detail.field}: ${detail.message}`)
         .join("; ");
       setStatus({
-        s: "error",
-        msg:
-          err.status === 429
-            ? "Too many messages. Please try again later."
-            : `${err.message}${fields ? ` (${fields})` : ""}`,
+        state: "error",
+        message:
+          error.status === 429
+            ? "Too many messages. Please wait a while before trying again."
+            : `${error.message}${fields ? ` (${fields})` : ""}`,
       });
     }
   }
 
+  const sending = status.state === "sending";
   return (
-    <section aria-labelledby="contact" className="max-w-xl">
-      <h1 id="contact" className="mb-4 text-3xl">
-        Contact
-      </h1>
-      <form onSubmit={submit} className="glass space-y-4">
-        {[
-          ["name", "Name", "text", 80],
-          ["email", "Email", "email", 254],
-          ["subject", "Subject", "text", 120],
-        ].map(([k, label, type, max]) => (
-          <div key={k}>
-            <label htmlFor={k} className="mb-1 block text-sm">
-              {label}
-            </label>
-            <input
-              id={k}
-              type={type}
-              required
-              maxLength={max}
-              className="input"
-              value={f[k]}
-              onChange={on(k)}
-              autoComplete={
-                k === "name" ? "name" : k === "email" ? "email" : "off"
-              }
-            />
-          </div>
-        ))}
-        <div>
-          <label htmlFor="message" className="mb-1 block text-sm">
-            Message (10–2000 characters)
-          </label>
-          <textarea
-            id="message"
-            required
-            minLength={10}
-            maxLength={2000}
-            rows={6}
-            className="input"
-            value={f.message}
-            onChange={on("message")}
-          />
+    <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-14">
+      <section aria-labelledby="contact">
+        <div className="page-intro !mb-6">
+          <p className="eyebrow">Start a conversation / 06</p>
+          <h1 id="contact" className="mt-3 text-4xl sm:text-5xl">Get in touch</h1>
+          <p className="mt-4 leading-relaxed">
+            Have a question about a project, security learning, or a possible
+            collaboration? Send a note using the form.
+          </p>
         </div>
-        {/* Honeypot: invisible to people and assistive tech, bots fill it. */}
-        <div className="absolute -left-[9999px]" aria-hidden="true">
-          <label htmlFor="website">Leave empty</label>
-          <input
-            id="website"
-            tabIndex={-1}
-            autoComplete="off"
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-          />
+        <div className="glass">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-slate-500">Direct contact</p>
+          <a className="mt-2 inline-flex break-all text-sm accent hover:underline" href={`mailto:${profile.email}`}>
+            {profile.email} ↗
+          </a>
+          <p className="prose-copy mt-4 text-sm">
+            Please avoid including passwords, credentials, or other sensitive information.
+          </p>
         </div>
-        <Turnstile onToken={setToken} />
-        <button className="btn btn-solid" disabled={status.s === "sending"}>
-          {status.s === "sending" ? "Sending…" : "Send message"}
-        </button>
-        <p role="status" aria-live="polite" className="text-sm">
-          {status.s === "ok" && "Thanks! Your message was sent."}
-          {status.s === "error" && (
-            <span className="text-red-700 dark:text-red-300">{status.msg}</span>
-          )}
-        </p>
-      </form>
-    </section>
+      </section>
+
+      <section aria-label="Contact form">
+        {status.state === "success" ? (
+          <motion.div
+            className="glass flex min-h-80 flex-col items-start justify-center"
+            role="status"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-500/10 text-2xl accent" aria-hidden="true">✓</span>
+            <p className="eyebrow mt-5">Message sent</p>
+            <h2 className="mt-2 text-2xl">Thanks for reaching out.</h2>
+            <p className="prose-copy mt-2 text-sm">Your message was submitted successfully.</p>
+            <button className="btn mt-6" onClick={() => setStatus({ state: "idle" })}>Send another message</button>
+          </motion.div>
+        ) : (
+          <form onSubmit={submit} className="glass space-y-5" aria-busy={sending}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="name" className="mb-1.5 block text-sm font-medium">Name</label>
+                <input id="name" name="name" className="input" type="text" required maxLength={80} autoComplete="name" value={form.name} onChange={onChange("name")} />
+              </div>
+              <div>
+                <label htmlFor="email" className="mb-1.5 block text-sm font-medium">Email</label>
+                <input id="email" name="email" className="input" type="email" required maxLength={254} autoComplete="email" value={form.email} onChange={onChange("email")} />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="subject" className="mb-1.5 block text-sm font-medium">Subject</label>
+              <input id="subject" name="subject" className="input" type="text" required minLength={3} maxLength={120} value={form.subject} onChange={onChange("subject")} />
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <label htmlFor="message" className="text-sm font-medium">Message</label>
+                <span className="font-mono text-[10px] text-slate-500">{form.message.length}/2000</span>
+              </div>
+              <textarea
+                id="message"
+                name="message"
+                className="input min-h-40 resize-y"
+                required
+                minLength={10}
+                maxLength={2000}
+                value={form.message}
+                onChange={onChange("message")}
+                aria-describedby="message-hint"
+              />
+              <p id="message-hint" className="mt-1 text-xs text-slate-500">At least 10 characters. Please don’t include sensitive information.</p>
+            </div>
+            <div className="absolute -left-[9999px]" aria-hidden="true">
+              <label htmlFor="website">Leave this field empty</label>
+              <input id="website" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} />
+            </div>
+            <Turnstile onToken={onToken} />
+            {status.state === "error" && (
+              <p className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700 dark:text-red-300" role="alert">
+                {status.message}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-white/10">
+              <p className="text-xs text-slate-500">Protected by abuse prevention controls.</p>
+              <button className="btn btn-solid min-w-36" disabled={sending} aria-busy={sending}>
+                {sending ? (
+                  <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" /> Sending…</>
+                ) : (
+                  <>Send message <span aria-hidden="true">→</span></>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+    </div>
   );
 }

@@ -62,8 +62,8 @@ x-api-common: &api-common
 
 services:
   # ---------------------------------------------------------------------------
-  # Nginx: the ONLY service with published ports.
-  # nginx-unprivileged runs as non-root, so it listens on 8080/8443 internally.
+  # Nginx: the ONLY service with published ports. The unprivileged image runs as
+  # a non-root user and listens on 8080 internally.
   # ---------------------------------------------------------------------------
   nginx:
     build:
@@ -81,7 +81,6 @@ services:
       - /tmp:size=16m
       - /var/run:size=1m
     cap_drop: [ALL]
-    cap_add: [CHOWN, SETGID, SETUID, DAC_OVERRIDE, FOWNER]
     security_opt:
       - no-new-privileges:true
     networks: [frontend, backend]
@@ -119,8 +118,9 @@ services:
       INSTANCE_ID: api3
 
   # ---------------------------------------------------------------------------
-  # Redis: password-protected, internal only, no persistence needed beyond AOF
-  # for the token blacklist.
+  # Redis: password-protected, internal only, AOF-backed. Never evict security
+  # state (refresh sessions, token revocations or rate-limit counters) under
+  # memory pressure; cache writes are best-effort and already tolerate errors.
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7.4-alpine
@@ -134,7 +134,7 @@ services:
       - --maxmemory
       - 128mb
       - --maxmemory-policy
-      - allkeys-lru                               # cache evicts, never OOMs the host
+      - noeviction
     environment:
       REDISCLI_AUTH: ${REDIS_PASSWORD}            # lets healthcheck auth without -a flag
     volumes:

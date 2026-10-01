@@ -8,7 +8,7 @@ ARG VITE_TURNSTILE_SITE_KEY
 ENV VITE_TURNSTILE_SITE_KEY=$VITE_TURNSTILE_SITE_KEY
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginxinc/nginx-unprivileged:stable-alpine
 COPY Nginx/nginx.conf /etc/nginx/nginx.conf
 COPY --from=client-build /app/dist /usr/share/nginx/html
 EXPOSE 8080

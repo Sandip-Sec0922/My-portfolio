@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Accent: cyan-300 on dark and cyan-800 on light both exceed WCAG AA (4.5:1). */
+  body { @apply bg-slate-50 font-sans text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200; }
+  :focus-visible { @apply outline outline-2 outline-offset-2 outline-cyan-700 dark:outline-cyan-300; }
+  h1, h2, h3 { @apply font-semibold tracking-tight text-slate-900 dark:text-white; }
+}
+
+@layer components {
+  .glass { @apply rounded-xl border border-slate-300/70 bg-white/70 p-5 backdrop-blur-md dark:border-white/10 dark:bg-white/5; }
+  .btn { @apply inline-flex items-center gap-2 rounded-lg border border-cyan-700 px-4 py-2 font-mono text-sm font-medium text-cyan-800 transition hover:bg-cyan-700 hover:text-white dark:border-cyan-300 dark:text-cyan-300 dark:hover:bg-cyan-300 dark:hover:text-slate-950; }
+  .btn-solid { @apply bg-cyan-700 text-white hover:bg-cyan-800 dark:bg-cyan-300 dark:text-slate-950 dark:hover:bg-cyan-200; }
+  .tag { @apply rounded-md bg-slate-200 px-2 py-0.5 font-mono text-xs text-slate-800 dark:bg-white/10 dark:text-slate-200; }
+  .input { @apply w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-white; }
+  .accent { @apply text-cyan-800 dark:text-cyan-300; }
+  .btn-sm { @apply px-3 py-1 text-xs; }
+  .btn-danger { @apply inline-flex items-center rounded-lg border border-red-700 px-3 py-1 font-mono text-xs font-medium text-red-800 transition hover:bg-red-700 hover:text-white dark:border-red-300 dark:text-red-300 dark:hover:bg-red-300 dark:hover:text-slate-950; }
+}

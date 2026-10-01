@@ -1,0 +1,203 @@
+# =============================================================================
+# SOC Portfolio - production-oriented stack
+#
+# Networks (WHY three): limits blast radius. If Nginx is compromised it still
+# cannot talk to MongoDB/Redis. If the data tier is compromised it has no route
+# to the internet for exfiltration (internal: true).
+#
+#   frontend : Nginx only, the single publicly published component
+#   backend  : Nginx <-> API replicas
+#   data     : API replicas <-> Redis/MongoDB (internal: true => no egress)
+# =============================================================================
+
+name: soc-portfolio
+
+x-api-common: &api-common\
+  init: true
+  build:
+    context: ./server
+    dockerfile: Dockerfile
+    target: production
+  restart: unless-stopped
+  # WHY: non-root user is set in the Dockerfile; these flags harden the runtime.
+  read_only: true                      # immutable root filesystem
+  tmpfs:
+    - /tmp:size=16m,noexec,nosuid      # only writable scratch space
+  cap_drop: [ALL]                      # API needs no Linux capabilities
+  security_opt:
+    - no-new-privileges:true           # blocks setuid privilege escalation
+  environment: &api-env
+    NODE_ENV: production
+    PORT: 5000
+    MONGO_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=${MONGO_DB}
+    REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET}
+    JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
+    CSRF_SECRET: ${CSRF_SECRET:?set CSRF_SECRET}
+    CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS}
+    COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+    GITHUB_USERNAME: ${GITHUB_USERNAME:-Sandip-Sec0922}
+    GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
+    SMTP_HOST: ${SMTP_HOST:-}
+    SMTP_PORT: ${SMTP_PORT:-587}
+    SMTP_USER: ${SMTP_USER:-}
+    SMTP_PASS: ${SMTP_PASS:-}
+    NOTIFY_EMAIL: ${NOTIFY_EMAIL:-}
+    ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+    ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+  networks: [backend, data]
+  depends_on:
+    mongo:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/api/health"]
+    interval: 15s
+    timeout: 3s
+    retries: 3
+    start_period: 20s
+  # No `ports:` on purpose. The API is reachable only through Nginx.
+
+services:
+  # ---------------------------------------------------------------------------
+  # Nginx: the ONLY service with published ports.
+  # nginx-unprivileged runs as non-root, so it listens on 8080/8443 internally.
+  # ---------------------------------------------------------------------------
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+      args:
+          VITE_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - ./nginx/certs:/etc/nginx/certs:ro        # TLS certs, read-only
+      - nginx_cache:/var/cache/nginx
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+      - /var/run:size=1m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    networks: [frontend, backend]
+    depends_on:
+      api1: { condition: service_healthy }
+      api2: { condition: service_healthy }
+      api3: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/nginx-health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # API replicas. Explicit api1..3 (instead of `deploy.replicas`) so the Nginx
+  # upstream can name each one and apply max_fails/fail_timeout failover.
+  # ---------------------------------------------------------------------------
+  api1:
+    <<: *api-common
+    hostname: api1
+    environment:
+      <<: *api-env
+      INSTANCE_ID: api1
+  api2:
+    <<: *api-common
+    hostname: api2
+    environment:
+      <<: *api-env
+      INSTANCE_ID: api2
+  api3:
+    <<: *api-common
+    hostname: api3
+    environment:
+      <<: *api-env
+      INSTANCE_ID: api3
+
+  # ---------------------------------------------------------------------------
+  # Redis: password-protected, internal only, no persistence needed beyond AOF
+  # for the token blacklist.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - allkeys-lru                               # cache evicts, never OOMs the host
+      - --rename-command
+      - FLUSHALL ""                               # disable destructive commands
+      - --rename-command
+      - FLUSHDB ""
+      - --rename-command
+      - CONFIG ""
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}            # lets healthcheck auth without -a flag
+    volumes:
+      - redis_data:/data
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID]                     # needed by the image's entrypoint to drop to redis user
+    security_opt:
+      - no-new-privileges:true
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # MongoDB: auth enforced. Root user is used ONLY by the init script to create
+  # the app user, which has readWrite on a single database.
+  # ---------------------------------------------------------------------------
+  mongo:
+    image: mongo:7.0
+    restart: unless-stopped
+    command: ["mongod", "--auth", "--bind_ip", "0.0.0.0", "--noscripting"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?set MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+      MONGO_DB: ${MONGO_DB}
+      MONGO_APP_USER: ${MONGO_APP_USER}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+      - ./docker/mongo/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh:ro
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID, DAC_OVERRIDE, FOWNER]   # image entrypoint needs these to fix data-dir ownership
+    security_opt:
+      - no-new-privileges:true
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge          # not internal: API must reach GitHub API / SMTP / Turnstile
+  data:
+    driver: bridge
+    internal: true          # WHY: DB tier has zero route to the internet
+
+volumes:
+  mongo_data:
+  redis_data:
+  nginx_cache:

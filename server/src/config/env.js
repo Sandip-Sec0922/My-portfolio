@@ -1,0 +1,98 @@
+"use strict";
+const { z } = require("zod");
+
+// Compose passes unset optional vars as "" -> treat as undefined.
+const raw = Object.fromEntries(
+  Object.entries(process.env).filter(([, v]) => v !== ""),
+);
+
+const schema = z
+  .object({
+    NODE_ENV: z
+      .enum(["development", "test", "production"])
+      .default("development"),
+    PORT: z.coerce.number().int().default(5000),
+    INSTANCE_ID: z.string().default("local"),
+    LOG_LEVEL: z.string().optional(),
+    MONGO_URI: z.string().min(1),
+    REDIS_URL: z.string().min(1),
+    JWT_ACCESS_SECRET: z.string().min(32),
+    JWT_REFRESH_SECRET: z.string().min(32),
+    CSRF_SECRET: z.string().min(32),
+    CORS_ORIGINS: z.string().min(1),
+    COOKIE_DOMAIN: z.string().optional(),
+    GITHUB_USERNAME: z.string().default("Sandip-Sec0922"),
+    GITHUB_TOKEN: z.string().optional(),
+    TURNSTILE_SECRET: z.string().optional(),
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().default(587),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    NOTIFY_EMAIL: z.string().email().optional(),
+    ADMIN_BOOTSTRAP_EMAIL: z.string().email().optional(),
+    ADMIN_BOOTSTRAP_PASSWORD: z.string().min(14).optional(),
+  })
+  // WHY: one leaked/guessed secret must not let an attacker forge the other token types.
+  .refine(
+    (e) =>
+      new Set([e.JWT_ACCESS_SECRET, e.JWT_REFRESH_SECRET, e.CSRF_SECRET])
+        .size === 3,
+    {
+      message:
+        "JWT_ACCESS_SECRET, JWT_REFRESH_SECRET and CSRF_SECRET must all be different",
+    },
+  );
+
+// WHY fail fast: a misconfigured security setting should stop boot, not silently weaken the app.
+// Only variable names and rules are printed, never values.
+const parsed = schema.safeParse(raw);
+if (!parsed.success) {
+  console.error(
+    "Invalid environment configuration:",
+    parsed.error.issues.map(
+      (i) => `${i.path.join(".") || "(root)"}: ${i.message}`,
+    ),
+  );
+  process.exit(1);
+}
+
+const e = parsed.data;
+const isProd = e.NODE_ENV === "production";
+
+module.exports = Object.freeze({
+  env: e.NODE_ENV,
+  isProd,
+  isTest: e.NODE_ENV === "test",
+  port: e.PORT,
+  instanceId: e.INSTANCE_ID,
+  logLevel:
+    e.LOG_LEVEL ||
+    (e.NODE_ENV === "test" ? "silent" : isProd ? "info" : "debug"),
+  mongoUri: e.MONGO_URI,
+  redisUrl: e.REDIS_URL,
+  jwt: {
+    accessSecret: e.JWT_ACCESS_SECRET,
+    refreshSecret: e.JWT_REFRESH_SECRET,
+    issuer: "soc-portfolio",
+    accessTtl: "15m",
+    refreshTtlSec: 7 * 24 * 3600,
+  },
+  csrfSecret: e.CSRF_SECRET,
+  corsOrigins: e.CORS_ORIGINS.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+  cookieDomain: e.COOKIE_DOMAIN,
+  github: { username: e.GITHUB_USERNAME, token: e.GITHUB_TOKEN },
+  turnstileSecret: e.TURNSTILE_SECRET,
+  smtp: {
+    host: e.SMTP_HOST,
+    port: e.SMTP_PORT,
+    user: e.SMTP_USER,
+    pass: e.SMTP_PASS,
+    notifyEmail: e.NOTIFY_EMAIL,
+  },
+  adminBootstrap: {
+    email: e.ADMIN_BOOTSTRAP_EMAIL,
+    password: e.ADMIN_BOOTSTRAP_PASSWORD,
+  },
+});

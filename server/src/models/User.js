@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema(
     },
     // select:false -> the hash is never loaded unless a query explicitly asks (login / change-password).
     passwordHash: { type: String, required: true, select: false },
-    role: { type: String, enum: ["admin"], default: "admin" },
+    role: { type: String, enum: ["admin"], default: "admin", unique: true },
     lastLoginAt: Date,
   },
   { timestamps: true },

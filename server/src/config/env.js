@@ -6,12 +6,41 @@ const raw = Object.fromEntries(
   Object.entries(process.env).filter(([, v]) => v !== ""),
 );
 
+const bootstrapVariables = [
+  "ADMIN_BOOTSTRAP_EMAIL",
+  "ADMIN_BOOTSTRAP_PASSWORD",
+].filter((key) => process.env[key]);
+if (bootstrapVariables.length) {
+  console.error(
+    `${bootstrapVariables.join(", ")} must not be set on the API service; use npm run admin:bootstrap once instead.`,
+  );
+  process.exit(1);
+}
+
+function isProductionOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === "https:" &&
+      url.origin === origin &&
+      !url.username &&
+      !url.password &&
+      url.hostname !== "localhost" &&
+      !url.hostname.endsWith(".localhost") &&
+      !url.hostname.startsWith("127.") &&
+      url.hostname !== "[::1]"
+    );
+  } catch {
+    return false;
+  }
+}
+
 const schema = z
   .object({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    PORT: z.coerce.number().int().default(5000),
+    PORT: z.coerce.number().int().min(1).max(65535).default(10000),
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(1),
     INSTANCE_ID: z.string().default("local"),
     LOG_LEVEL: z.string().optional(),
@@ -45,25 +74,40 @@ const schema = z
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
     NOTIFY_EMAIL: z.string().email().optional(),
-    ADMIN_BOOTSTRAP_EMAIL: z.string().email().optional(),
-    ADMIN_BOOTSTRAP_PASSWORD: z.string().min(14).optional(),
   })
-  // WHY: one leaked/guessed secret must not let an attacker forge the other token types.
-  .refine(
-    (e) =>
-      new Set([e.JWT_ACCESS_SECRET, e.JWT_REFRESH_SECRET, e.CSRF_SECRET])
-        .size === 3,
-    {
-      message:
-        "JWT_ACCESS_SECRET, JWT_REFRESH_SECRET and CSRF_SECRET must all be different",
-    },
-  )
   .superRefine((e, ctx) => {
+    if (
+      new Set([e.JWT_ACCESS_SECRET, e.JWT_REFRESH_SECRET, e.CSRF_SECRET])
+        .size !== 3
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["JWT_ACCESS_SECRET"],
+        message:
+          "JWT_ACCESS_SECRET, JWT_REFRESH_SECRET and CSRF_SECRET must all be different",
+      });
+    }
+
+    const origins = e.CORS_ORIGINS.split(",").map((origin) => origin.trim());
+    if (
+      e.NODE_ENV === "production" &&
+      (origins.length !== 1 ||
+        !origins[0] ||
+        origins[0] === "*" ||
+        !isProductionOrigin(origins[0]))
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CORS_ORIGINS"],
+        message:
+          "Production requires exactly one HTTPS frontend origin (no wildcard, localhost, path, or trailing slash)",
+      });
+    }
+
     const values = {
       JWT_ACCESS_SECRET: e.JWT_ACCESS_SECRET,
       JWT_REFRESH_SECRET: e.JWT_REFRESH_SECRET,
       CSRF_SECRET: e.CSRF_SECRET,
-      ADMIN_BOOTSTRAP_PASSWORD: e.ADMIN_BOOTSTRAP_PASSWORD,
     };
     Object.entries(values).forEach(([key, value]) => {
       if (value && /^change_me(?:_|$)/i.test(value)) {
@@ -125,9 +169,5 @@ module.exports = Object.freeze({
     user: e.SMTP_USER,
     pass: e.SMTP_PASS,
     notifyEmail: e.NOTIFY_EMAIL,
-  },
-  adminBootstrap: {
-    email: e.ADMIN_BOOTSTRAP_EMAIL,
-    password: e.ADMIN_BOOTSTRAP_PASSWORD,
   },
 });

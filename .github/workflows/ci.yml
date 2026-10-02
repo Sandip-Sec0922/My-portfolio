@@ -53,6 +53,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Reject placeholder API rewrite hostname
+        run: |
+          if grep -Fq 'replace-with-public-api-host.invalid' vercel.json; then
+            echo 'Replace the placeholder API hostname in client/vercel.json before deploying.'
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 24

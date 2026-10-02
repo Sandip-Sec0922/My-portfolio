@@ -59,13 +59,13 @@ docs/              Security checklist and threat model
 | Setting | Local development | Production |
 |---|---|---|
 | Frontend | Vite dev server, typically `http://localhost:5173` | Vercel project rooted at `client/` |
-| API | Node on `PORT` (default 5000) | Render web service using `server/Dockerfile` |
+| API | Node on `PORT` (default 10000; Compose sets 5000 locally) | Single Render web service using `server/Dockerfile` |
 | MongoDB | Local MongoDB or test double | Atlas least-privilege database user |
-| Redis | Local Redis-compatible service | Same-region Render Key Value |
+| Redis | Local Redis-compatible service | External Upstash-compatible Redis URL in `REDIS_URL` |
 | Secrets | Ignored local `.env` | Render secret environment variables |
 | Public API path | Vite proxy `/api` | Vercel same-origin rewrite `/api/*` |
 
-Use `.env.example` as a variable-name reference only. Replace all `change_me...` placeholders; the API now rejects those values for signing and bootstrap-admin secrets. Generate three distinct signing secrets of at least 32 characters. Do not print, commit, email, or paste secrets into tickets or chat.
+Use `.env.example` as a variable-name reference only. Replace all `change_me...` placeholders. Generate three distinct signing secrets of at least 32 characters. Bootstrap the initial admin once with `npm run admin:bootstrap` from a trusted machine; do not set bootstrap credentials on the running API service. Do not print, commit, email, or paste secrets into tickets or chat.
 
 The database URI must use the least-privilege application account and identify the intended database. URL-encode URI-reserved password characters. Rotate credentials that have been exposed, and only configure replacement credentials through ignored local files or provider secret stores.
 
@@ -92,11 +92,11 @@ Use the smallest relevant test suite during iteration, then run the full API tes
 
 ### Render
 
-- Create a Blueprint from `render.yaml`; API and Key Value are configured for the same region. The API readiness check is `/api/health/ready`.
+- Create a Blueprint from `render.yaml`; it provisions one API web service only. Configure Atlas and external Redis through `MONGO_URI` and `REDIS_URL`. The Render readiness check is `/api/health`.
 - Set all `sync: false` values in Render. Required values include `MONGO_URI`, the three signing secrets, `CORS_ORIGINS`, and bootstrap admin credentials. Optional mail and Turnstile settings are listed in `.env.example`.
 - The Blueprint uses free plans: Render may sleep the API after inactivity, and free Key Value is ephemeral. Redis restart/eviction clears active sessions and rate-limit counters. Choose paid plans if continuous uptime or persistent Redis state is required.
 - After creating and changing the bootstrap admin password, remove the bootstrap email/password environment variables.
-- Confirm both `/api/health` and `/api/health/ready`; only readiness verifies MongoDB and Redis.
+- Confirm `/api/health` returns 200 only when MongoDB and Redis can be pinged.
 
 ### MongoDB Atlas
 

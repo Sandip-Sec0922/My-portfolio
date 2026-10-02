@@ -45,8 +45,6 @@ x-api-common: &api-common
     SMTP_USER: ${SMTP_USER:-}
     SMTP_PASS: ${SMTP_PASS:-}
     NOTIFY_EMAIL: ${NOTIFY_EMAIL:-}
-    ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
-    ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
   networks: [backend, data]
   depends_on:
     mongo:

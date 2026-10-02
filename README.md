@@ -20,11 +20,11 @@ Browser
         └── same-origin /api/* and /sitemap.xml rewrite
               └── Render: Express API (server/Dockerfile)
                     ├── MongoDB Atlas: users, content, messages, security events
-                    ├── Render Key Value: cache, rate limits, login lockout, sessions
+                    ├── external Redis-compatible service: sessions, rate limits, lockout, caches
                     └── GitHub / optional Turnstile and SMTP
 ```
 
-The browser calls `/api/*` on the Vercel origin. This preserves the app's same-site, `SameSite=Strict` authentication-cookie behavior; do not change the client to call the Render hostname directly. The API's health endpoints are `/api/health` (liveness) and `/api/health/ready` (MongoDB and Redis readiness).
+The browser calls `/api/*` on the Vercel origin. This preserves the app's same-site, `SameSite=Strict` authentication-cookie behavior; do not change the client to call the Render hostname directly. `GET /api/health` checks MongoDB and Redis connectivity and is the Render health check; `/api/health/live` reports process liveness.
 
 ## Local development
 
@@ -33,12 +33,37 @@ Requirements: Node.js 22 or newer, npm, MongoDB, and Redis or a compatible local
 1. Copy `.env.example` to `.env`; replace every `change_me...` value with unique generated secrets. Keep `.env` ignored and never paste credentials into source files or documentation.
 2. Configure local `MONGO_URI`, `REDIS_URL`, `CORS_ORIGINS=http://localhost:5173`, and three distinct secrets (each at least 32 characters). Set `TRUST_PROXY_HOPS=0` when running the API directly without a reverse proxy.
 3. Start MongoDB and Redis locally. For the full application in local Compose, use `docker compose up --build` with the root `.env`; that stack serves the site through its local Nginx container rather than through the Vite dev server.
-4. Start the API in `server/` with `npm ci` and `npm run dev`, then start the frontend in `client/` with `npm ci` and `npm run dev`.
+4. Start the API in `server/` with `npm ci`, set `$env:PORT = '5000'` in PowerShell (Compose sets 5000 automatically), then run `npm run dev`; start the frontend in `client/` with `npm ci` and `npm run dev`.
 5. Open `http://localhost:5173`. Vite proxies `/api` to the API on port 5000.
 
 The root Compose file models the local full stack and binds the Nginx HTTP port to 80. It is not a recommended public deployment configuration.
 
-## Deploying to Vercel, Render, and Atlas
+## Deploy to Render
+
+1. Create a Render account, connect this GitHub repository, and create a **Blueprint** from `render.yaml`. A Blueprint is preferable because the single Docker web service is declared and repeatable; it does not provision a local MongoDB, Nginx, API replicas, or a Render Redis sidecar.
+2. In the Blueprint service's Environment settings, set:
+   - `MONGO_URI`: `<Atlas connection string for a least-privilege application user>`
+   - `REDIS_URL`: `<Upstash Redis TLS URL, beginning rediss://>`
+   - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CSRF_SECRET`: three distinct generated random strings, each at least 32 characters
+   - `CORS_ORIGINS`: `https://<your-vercel-frontend-host>` (one exact HTTPS origin, no path or trailing slash)
+   - Optional: `TURNSTILE_SECRET`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `NOTIFY_EMAIL`
+3. Deploy the Blueprint and wait for the service health check to pass. Render supplies `PORT`; the API defaults to `10000` if run outside Render. Do not set the admin bootstrap variables on the running service.
+4. Create the first admin once from a trusted machine that can reach Atlas. In PowerShell, from the repository root, set the variables only for the current shell, run the CLI, and remove them:
+   ```powershell
+   Set-Location server
+   $env:MONGO_URI = '<Atlas connection string>'
+   $env:ADMIN_BOOTSTRAP_EMAIL = '<admin email>'
+   $env:ADMIN_BOOTSTRAP_PASSWORD = '<unique password, at least 14 characters>'
+   npm ci
+   npm run admin:bootstrap
+   Remove-Item Env:MONGO_URI, Env:ADMIN_BOOTSTRAP_EMAIL, Env:ADMIN_BOOTSTRAP_PASSWORD
+   ```
+   The CLI refuses a second admin and does not log the password. Never save these bootstrap variables in Render or commit them.
+5. Test the public service: `curl.exe -i https://<render-service-host>/api/health` should return HTTP 200 with `{"status":"ready","dependencies":{"mongo":true,"redis":true}}`. Copy the final `https://<render-service-host>` URL from the Render service's dashboard for the Vercel rewrite destination.
+
+Upstash is used as an external Redis-compatible service because Render's free web service runs one container and the backend requires Redis for authentication sessions, rate limiting, lockout, revocation, and caching. Configure its TLS connection URL as `REDIS_URL`; never run Redis as a sidecar or put its credentials in the image.
+
+## Deploying to Vercel and Atlas
 
 ### Vercel frontend
 
@@ -47,24 +72,12 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
 3. The rewrite currently targets `https://soc-portfolio-api.onrender.com`. After creating the Render service, verify its actual public hostname and update both external destinations in `client/vercel.json` if Render assigned a different host.
 4. Set `VITE_TURNSTILE_SITE_KEY` in Vercel only if Turnstile is enabled. `VITE_*` values are public and must never contain secrets.
 
-### Render API and Key Value
-
-1. Create a Render Blueprint from `render.yaml`. It declares the API, private Key Value service, same-region placement, Redis connection, and readiness endpoint.
-2. Set the variables marked `sync: false` in Render:
-   - `MONGO_URI`: Atlas connection string for the least-privilege application user and the `soc_portfolio` database.
-   - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `CSRF_SECRET`: three different random values, at least 32 characters each.
-   - `CORS_ORIGINS`: exact Vercel origin(s), comma-separated, without trailing slashes.
-   - `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD`: initial admin credentials. After creating the account and changing its password, remove these variables from Render.
-   - Optional integrations: `TURNSTILE_SECRET`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, and `NOTIFY_EMAIL`. Turnstile is enforced whenever its server secret is configured, so configure its site key in Vercel at the same time.
-3. Keep the API and Key Value in the same Render region. The Blueprint uses the free plans; the API may sleep when idle and Key Value is ephemeral. Restarts can clear Redis-backed sessions and counters. Upgrade plans if continuous availability or persistent Redis state is required.
-4. `TRUST_PROXY_HOPS` defaults to `1`; verify the actual client IP in Render logs and test that a forged `X-Forwarded-For` value is not trusted before increasing it. Do not increase the value speculatively.
-
 ### MongoDB Atlas
 
 - Use a dedicated database user with `readWrite` access only to the application database; do not use an Atlas administrator credential.
 - Atlas requires network access from Render. Prefer a private connection or static Render egress IP allowlisting when available. If a broad Atlas IP access list is necessary, understand the increased exposure and rely on TLS, a strong unique password, and the least-privilege database role.
 - URL-encode special characters in MongoDB credentials. Never commit the URI or print it in diagnostics.
-- A live connection is not established by these files alone; confirm `/api/health/ready` after configuring the service.
+- A live connection is not established by these files alone; confirm `/api/health` after configuring the service.
 
 ## Validation
 
@@ -92,6 +105,6 @@ The CI workflows run server tests/lint, the client production build, and reposit
 ## Known operational limits
 
 - The admin account does not have MFA yet.
-- The free Render API can cold-start after inactivity; free Key Value has no durable persistence.
+- The free Render API can cold-start after inactivity; free Upstash plans have command/data limits and may be ephemeral or subject to provider-specific eviction.
 - Vercel/Render replace the Nginx-only scanner blocking and connection limits from the old local stack; API rate limits remain active.
 - Sitemap and blog pages do not make this client-rendered SPA fully server-rendered for search engines.

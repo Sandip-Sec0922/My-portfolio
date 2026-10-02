@@ -4,7 +4,6 @@ const config = require("./config/env");
 const logger = require("./utils/logger");
 const redis = require("./config/redis");
 const { connectDB } = require("./config/db");
-const bootstrapAdmin = require("./services/bootstrapAdmin");
 const passwords = require("./services/passwordService");
 const { createApp } = require("./app");
 
@@ -21,13 +20,12 @@ const waitForRedis = (ms = 10000) =>
 async function main() {
   await connectDB();
   await waitForRedis();
-  await bootstrapAdmin();
   await passwords.dummyHash();
 
   const server = createApp().listen(config.port, () =>
     logger.info({ port: config.port }, "api_listening"),
   );
-  // keepAlive > Nginx's upstream keepalive timeout avoids sporadic 502s; requestTimeout bounds slowloris-style clients.
+  // Keep persistent requests bounded while remaining compatible with managed ingress.
   server.keepAliveTimeout = 65000;
   server.headersTimeout = 66000;
   server.requestTimeout = 15000;

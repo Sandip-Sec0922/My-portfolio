@@ -26,7 +26,7 @@ Use this checklist before and after deploying the Vercel + Render + Atlas config
 - [ ] Set `MONGO_URI`, `CORS_ORIGINS`, three distinct signing secrets (32+ characters), and bootstrap-admin credentials.
 - [ ] Configure optional Turnstile server secret, SMTP credentials, and notification address only when used.
 - [ ] Remove bootstrap-admin environment variables after initial setup and password change.
-- [ ] Confirm `/api/health` returns liveness and `/api/health/ready` returns ready only when MongoDB and Redis are connected.
+- [ ] Confirm `/api/health` returns 200 only when MongoDB and Redis are reachable; `/api/health/live` is process liveness only.
 - [ ] Check logs for `api_listening`, MongoDB connection, Redis errors, and failed environment validation; never log secret values.
 - [ ] Measure the client IP observed by the API and spoof-test a supplied `X-Forwarded-For` before increasing `TRUST_PROXY_HOPS`.
 - [ ] Understand free-plan cold starts and ephemeral Redis. Upgrade if persistent sessions, counters, or continuous uptime are required.

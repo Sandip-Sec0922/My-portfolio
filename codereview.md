@@ -36,7 +36,7 @@
 
 ## Additional review notes
 
-- A ready endpoint now exists at `/api/health/ready` and checks both MongoDB and Redis; `/api/health` remains a liveness-only endpoint.
+- `/api/health` now checks live MongoDB and Redis connectivity for Render; `/api/health/live` reports process liveness.
 - Atlas contact-message persistence is present, but a live connection must be confirmed after deployment configuration.
 - `render.yaml` defines free Render plans. Expect API cold starts and ephemeral Key Value state; Redis restarts can invalidate sessions and counters.
 - `client/vercel.json` uses `soc-portfolio-api.onrender.com` as the expected Render hostname. Verify the actual hostname and change both rewrites if Render assigns a different URL.

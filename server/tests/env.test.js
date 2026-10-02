@@ -11,6 +11,23 @@ const validEnv = {
   CORS_ORIGINS: "http://localhost:5173",
 };
 
+function loadEnv(overrides = {}) {
+  const env = { ...process.env, ...validEnv, ...overrides };
+  if (!Object.hasOwn(overrides, "PORT")) delete env.PORT;
+  ["ADMIN_BOOTSTRAP_EMAIL", "ADMIN_BOOTSTRAP_PASSWORD"].forEach((key) => {
+    if (!Object.hasOwn(overrides, key)) delete env[key];
+  });
+  return spawnSync(
+    process.execPath,
+    ["-e", "const e=require('./src/config/env'); console.log(JSON.stringify({port:e.port}))"],
+    {
+      cwd: path.join(__dirname, ".."),
+      env,
+      encoding: "utf8",
+    },
+  );
+}
+
 test("rejects shipped placeholder secrets without echoing their values", () => {
   const placeholder = "change_me_this_is_not_a_secret";
   const result = spawnSync(
@@ -29,15 +46,41 @@ test("rejects shipped placeholder secrets without echoing their values", () => {
 });
 
 test("accepts distinct configured secrets", () => {
-  const result = spawnSync(
-    process.execPath,
-    ["-e", "require('./src/config/env')"],
-    {
-      cwd: path.join(__dirname, ".."),
-      env: { ...process.env, ...validEnv },
-      encoding: "utf8",
-    },
-  );
+  const result = loadEnv();
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({ port: 10000 });
+});
+
+test.each([
+  ["missing", ""],
+  ["wildcard", "*"],
+  ["localhost", "http://localhost:5173"],
+  ["multiple origins", "https://portfolio.example,https://preview.example"],
+])("refuses production CORS origin configuration: %s", (_name, origin) => {
+  const result = loadEnv({
+    NODE_ENV: "production",
+    CORS_ORIGINS: origin,
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("CORS_ORIGINS");
+});
+
+test("accepts one exact HTTPS frontend origin in production", () => {
+  const result = loadEnv({
+    NODE_ENV: "production",
+    CORS_ORIGINS: "https://portfolio.example",
+  });
 
   expect(result.status).toBe(0);
+});
+
+test("refuses bootstrap credentials in the running API environment", () => {
+  const result = loadEnv({
+    ADMIN_BOOTSTRAP_PASSWORD: "a-temporary-password-for-cli-only",
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("ADMIN_BOOTSTRAP_PASSWORD");
+  expect(result.stderr).not.toContain("a-temporary-password-for-cli-only");
 });

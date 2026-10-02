@@ -35,7 +35,8 @@ function createApp() {
   app.use(permissionsPolicy);
   app.use(noStore);
 
-  app.get("/api/health", health.live); // before limiter: health checks must never be throttled
+  app.get("/api/health", health.ready); // Render's health check must verify dependencies.
+  app.get("/api/health/live", health.live);
   app.get("/api/health/ready", health.ready);
 
   app.use(corsMw);

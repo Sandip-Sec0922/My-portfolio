@@ -6,7 +6,7 @@ services:
     plan: free
     dockerfilePath: ./server/Dockerfile
     dockerContext: ./server
-    healthCheckPath: /api/health/ready
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -15,10 +15,7 @@ services:
       - key: MONGO_URI
         sync: false
       - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: soc-portfolio-redis
-          property: connectionString
+        sync: false
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
@@ -29,12 +26,10 @@ services:
         sync: false
       - key: PUBLIC_SITE_URL
         value: https://sandipkepchhaki.com.np
-      - key: ADMIN_BOOTSTRAP_EMAIL
-        sync: false
-      - key: ADMIN_BOOTSTRAP_PASSWORD
-        sync: false
       - key: GITHUB_USERNAME
         value: Sandip-Sec0922
+      - key: GITHUB_TOKEN
+        sync: false
       - key: TURNSTILE_SECRET
         sync: false
       - key: SMTP_HOST
@@ -47,11 +42,3 @@ services:
         sync: false
       - key: NOTIFY_EMAIL
         sync: false
-
-  - type: keyvalue
-    name: soc-portfolio-redis
-    region: oregon
-    plan: free
-    maxmemoryPolicy: noeviction
-    persistenceMode: off
-    ipAllowList: []

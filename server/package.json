@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "admin:bootstrap": "node scripts/bootstrap-admin.js",
     "test": "jest --runInBand",
     "lint": "eslint . --max-warnings 0"
   },

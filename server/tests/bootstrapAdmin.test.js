@@ -33,7 +33,7 @@ const input = {
 };
 
 test("creates the one-time admin with a password hash and disconnects", async () => {
-  await bootstrapAdmin(input);
+  await expect(bootstrapAdmin(input)).resolves.toBe(true);
 
   expect(User.create).toHaveBeenCalledWith({
     email: input.email,
@@ -44,13 +44,21 @@ test("creates the one-time admin with a password hash and disconnects", async ()
   expect(mongoose.disconnect).toHaveBeenCalledTimes(1);
 });
 
-test("refuses to create another admin", async () => {
+test("returns successfully without changing an existing admin", async () => {
   User.exists.mockResolvedValue({ _id: "existing-admin" });
 
-  await expect(bootstrapAdmin(input)).rejects.toThrow(
-    "An admin account already exists",
-  );
+  await expect(bootstrapAdmin(input)).resolves.toBe(false);
   expect(User.create).not.toHaveBeenCalled();
+  expect(mongoose.disconnect).toHaveBeenCalledTimes(1);
+});
+
+test("treats a concurrent bootstrap as a successful no-op", async () => {
+  User.create.mockRejectedValueOnce({ code: 11000 });
+  User.exists
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce({ _id: "concurrent-admin" });
+
+  await expect(bootstrapAdmin(input)).resolves.toBe(false);
   expect(mongoose.disconnect).toHaveBeenCalledTimes(1);
 });
 

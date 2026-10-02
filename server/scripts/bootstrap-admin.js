@@ -20,15 +20,20 @@ async function bootstrapAdmin({ mongoUri, email, password }) {
   await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
   try {
     await User.init();
-    if (await User.exists({ role: "admin" })) {
-      throw new Error("An admin account already exists; refusing to bootstrap another");
-    }
+    if (await User.exists({ role: "admin" })) return false;
 
-    await User.create({
-      email,
-      passwordHash: await passwords.hash(password),
-      role: "admin",
-    });
+    try {
+      await User.create({
+        email,
+        passwordHash: await passwords.hash(password),
+        role: "admin",
+      });
+      return true;
+    } catch (error) {
+      if (error.code === 11000 && (await User.exists({ role: "admin" })))
+        return false;
+      throw error;
+    }
   } finally {
     await mongoose.disconnect();
   }
@@ -36,13 +41,15 @@ async function bootstrapAdmin({ mongoUri, email, password }) {
 
 async function main() {
   try {
-    await bootstrapAdmin({
+    const created = await bootstrapAdmin({
       mongoUri: process.env.MONGO_URI,
       email: process.env.ADMIN_BOOTSTRAP_EMAIL,
       password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
     });
     process.stdout.write(
-      "Initial admin created. Unset the one-time bootstrap environment variables.\n",
+      created
+        ? "Initial admin created. Unset the one-time bootstrap environment variables.\n"
+        : "An admin already exists; no changes made.\n",
     );
   } catch {
     console.error(

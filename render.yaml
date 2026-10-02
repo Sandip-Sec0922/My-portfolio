@@ -1,62 +1,97 @@
-# Exported from Render on 2026-10-02T08:20:04Z
+# Blueprint format version used by Render.
 version: "1"
+# Logical Render project grouping.
 projects:
-- name: My project
-  environments:
-  - name: Production
-    services:
-    - type: web
-      name: My-portfolio
-      runtime: docker
-      repo: https://github.com/Sandip-Sec0922/My-portfolio
-      plan: free
-      envVars:
-      - key: TURNSTILE_SITE_KEY
-        sync: false
-      - key: NOTIFY_EMAIL
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_HOST
-        sync: false
-      - key: TURNSTILE_SECRET
-        sync: false
-      - key: GITHUB_TOKEN
-        sync: false
-      - key: GITHUB_USERNAME
-        sync: false
-      - key: COOKIE_DOMAIN
-        sync: false
-      - key: CORS_ORIGINS
-        sync: false
-      - key: ADMIN_BOOTSTRAP_PASSWORD
-        sync: false
-      - key: ADMIN_BOOTSTRAP_EMAIL
-        sync: false
-      - key: CSRF_SECRET
-        sync: false
-      - key: JWT_REFRESH_SECRET
-        sync: false
-      - key: JWT_ACCESS_SECRET
-        sync: false
-      - key: REDIS_PASSWORD
-        sync: false
-      - key: MONGO_URI
-        sync: false
-      - key: MONGO_APP_PASSWORD
-        sync: false
-      - key: MONGO_APP_USER
-        sync: false
-      - key: MONGO_DB
-        sync: false
-      - key: MONGO_ROOT_PASSWORD
-        sync: false
-      - key: MONGO_ROOT_USER
-        sync: false
-      region: singapore
-      healthCheckPath: /api/health
-      dockerContext: .
-      dockerfilePath: server/Dockerfile
-      autoDeployTrigger: commit
+  # Render project name shown in the dashboard.
+  - name: My project
+    # Render environment grouping for this service.
+    environments:
+      - name: Production
+        # Resources provisioned in this environment.
+        services:
+          # A single publicly reachable backend web service.
+          - type: web
+            # Render service name.
+            name: My-portfolio
+            # Build this service from a Dockerfile.
+            runtime: docker
+            # Git repository containing the Blueprint and backend source.
+            repo: https://github.com/Sandip-Sec0922/My-portfolio
+            # Render free web-service plan.
+            plan: free
+            # Environment variables whose values are supplied in Render.
+            envVars:
+              # Public Turnstile site key used by the frontend integration.
+              - key: TURNSTILE_SITE_KEY
+                # Ask for this value during initial Blueprint creation.
+                sync: false
+              # Destination address for contact notifications.
+              - key: NOTIFY_EMAIL
+                sync: false
+              # SMTP authentication password.
+              - key: SMTP_PASS
+                sync: false
+              # SMTP authentication username.
+              - key: SMTP_USER
+                sync: false
+              # SMTP server hostname.
+              - key: SMTP_HOST
+                sync: false
+              # Cloudflare Turnstile server-side secret.
+              - key: TURNSTILE_SECRET
+                sync: false
+              # Optional GitHub API token.
+              - key: GITHUB_TOKEN
+                sync: false
+              # GitHub account used for repository data.
+              - key: GITHUB_USERNAME
+                sync: false
+              # Optional cookie domain override.
+              - key: COOKIE_DOMAIN
+                sync: false
+              # Allowed browser frontend origin.
+              - key: CORS_ORIGINS
+                sync: false
+              # Required external Redis-compatible connection URL (for example, Upstash rediss:// URL).
+              - key: REDIS_URL
+                sync: false
+              # CSRF signing secret.
+              - key: CSRF_SECRET
+                sync: false
+              # Refresh-token signing secret.
+              - key: JWT_REFRESH_SECRET
+                sync: false
+              # Access-token signing secret.
+              - key: JWT_ACCESS_SECRET
+                sync: false
+              # Local Compose Redis password; not the external REDIS_URL.
+              - key: REDIS_PASSWORD
+                sync: false
+              # MongoDB Atlas connection string.
+              - key: MONGO_URI
+                sync: false
+              # Local Compose Mongo app password; not used with Atlas URI.
+              - key: MONGO_APP_PASSWORD
+                sync: false
+              # Local Compose Mongo app user; not used with Atlas URI.
+              - key: MONGO_APP_USER
+                sync: false
+              # Local Compose database name; Atlas database comes from MONGO_URI.
+              - key: MONGO_DB
+                sync: false
+              # Local Compose Mongo root password; not used with Atlas.
+              - key: MONGO_ROOT_PASSWORD
+                sync: false
+              # Local Compose Mongo root user; not used with Atlas.
+              - key: MONGO_ROOT_USER
+                sync: false
+            # Render deployment region.
+            region: singapore
+            # Render polls this endpoint; it checks MongoDB and Redis availability.
+            healthCheckPath: /api/health
+            # Docker build context, relative to the repository root.
+            dockerContext: ./server
+            # Dockerfile path, relative to the repository root.
+            dockerfilePath: server/Dockerfile
+            # Deploy on every commit to the linked branch.
+            autoDeployTrigger: commit

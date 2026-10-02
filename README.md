@@ -58,7 +58,7 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
    npm run admin:bootstrap
    Remove-Item Env:MONGO_URI, Env:ADMIN_BOOTSTRAP_EMAIL, Env:ADMIN_BOOTSTRAP_PASSWORD
    ```
-   The CLI refuses a second admin and does not log the password. Never save these bootstrap variables in Render or commit them.
+   The CLI creates the admin only if none exists; reruns exit successfully without changing an existing admin. It never logs the password. Never save these bootstrap variables in Render or commit them.
 5. Test the public service: `curl.exe -i https://<render-service-host>/api/health` should return HTTP 200 with `{"status":"ready","dependencies":{"mongo":true,"redis":true}}`. Copy the final `https://<render-service-host>` URL from the Render service's dashboard for the Vercel rewrite destination.
 
 Upstash is used as an external Redis-compatible service because Render's free web service runs one container and the backend requires Redis for authentication sessions, rate limiting, lockout, revocation, and caching. Configure its TLS connection URL as `REDIS_URL`; never run Redis as a sidecar or put its credentials in the image.

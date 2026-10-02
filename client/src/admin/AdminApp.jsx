@@ -67,11 +67,9 @@ function Login() {
         <button className="btn btn-solid" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
-        <p className="text-sm">
-          <Link className="accent hover:underline" to="/admin/reset-password">
-            Forgot password?
-          </Link>
-        </p>
+        <Link className="btn w-full" to="/admin/reset-password">
+          Reset password
+        </Link>
         <p role="alert" className="text-sm text-red-700 dark:text-red-300">
           {err}
         </p>

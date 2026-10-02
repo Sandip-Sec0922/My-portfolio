@@ -85,8 +85,23 @@ async function requestCode(email) {
       throw new Error("Could not persist password reset code");
     await mail.sendAdminPasswordResetOtp(user.email, otp);
   } catch (error) {
-    await redis.del(keys.otp, keys.attempts);
-    logger.error({ err: error.message }, "admin_password_reset_delivery_failed");
+    const cleanup = await Promise.allSettled([
+      redis.del(keys.otp, keys.attempts, keys.cooldown),
+    ]);
+    if (cleanup[0].status === "rejected")
+      logger.error(
+        { err: cleanup[0].reason.message },
+        "admin_password_reset_cleanup_failed",
+      );
+    logger.error(
+      {
+        err: error.message,
+        code: error.code,
+        command: error.command,
+        responseCode: error.responseCode,
+      },
+      "admin_password_reset_delivery_failed",
+    );
     throw new AppError(
       503,
       "RESET_UNAVAILABLE",

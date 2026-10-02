@@ -87,6 +87,7 @@ beforeEach(() => {
   store.clear();
   jest.clearAllMocks();
   mail.canSendPasswordReset.mockReturnValue(true);
+  mail.sendAdminPasswordResetOtp.mockResolvedValue(undefined);
 });
 
 test("sends an OTP only to an existing admin and stores only its digest", async () => {
@@ -123,6 +124,23 @@ test("fails explicitly before lookup when SMTP is unavailable", async () => {
     code: "RESET_UNAVAILABLE",
   });
   expect(User.findOne).not.toHaveBeenCalled();
+});
+
+test("clears the OTP and cooldown after mail delivery fails", async () => {
+  User.findOne.mockResolvedValue(createUser());
+  mail.sendAdminPasswordResetOtp.mockRejectedValue(
+    Object.assign(new Error("SMTP authentication failed"), {
+      code: "EAUTH",
+      responseCode: 535,
+    }),
+  );
+
+  await expect(requestCode("admin@example.com")).rejects.toMatchObject({
+    status: 503,
+    code: "RESET_UNAVAILABLE",
+  });
+
+  expect(store.size).toBe(0);
 });
 
 test("accepts a code once, updates the password and revokes sessions/unlocks admin", async () => {

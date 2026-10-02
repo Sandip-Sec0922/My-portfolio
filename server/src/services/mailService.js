@@ -1,27 +1,39 @@
 "use strict";
+const dns = require("node:dns").promises;
 const nodemailer = require("nodemailer");
 const config = require("../config/env");
 
-let transport;
-function getTransport() {
+let transportPromise;
+async function getTransport() {
   const { host, port, user, pass, notifyEmail } = config.smtp;
   if (!host || !notifyEmail) return null; // optional feature
-  transport ??= nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    requireTLS: port !== 465, // never fall back to plaintext SMTP
-    auth: user ? { user, pass } : undefined,
-    connectionTimeout: 5000,
-    socketTimeout: 10000,
-  });
-  return transport;
+  if (!transportPromise) {
+    transportPromise = dns
+      .lookup(host, { family: 4 })
+      .then(({ address }) => {
+        return nodemailer.createTransport({
+          host: address,
+          port,
+          secure: port === 465,
+          requireTLS: port !== 465, // never fall back to plaintext SMTP
+          tls: { servername: host },
+          auth: user ? { user, pass } : undefined,
+          connectionTimeout: 10000,
+          socketTimeout: 10000,
+        });
+      })
+      .catch((error) => {
+        transportPromise = null;
+        throw error;
+      });
+  }
+  return transportPromise;
 }
 
 // Plain-text only (no HTML body) -> no HTML/script injection into your mail client.
 // Visitor-supplied name goes in the body, never a header; subject/email are already validated single-line.
 async function notifyNewMessage(msg) {
-  const t = getTransport();
+  const t = await getTransport();
   if (!t) return;
   await t.sendMail({
     from: config.smtp.user || config.smtp.notifyEmail,
@@ -33,7 +45,7 @@ async function notifyNewMessage(msg) {
 }
 
 async function sendAdminPasswordResetOtp(email, otp) {
-  const t = getTransport();
+  const t = await getTransport();
   if (!t) throw new Error("SMTP is not configured");
   await t.sendMail({
     from: config.smtp.user || config.smtp.notifyEmail,

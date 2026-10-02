@@ -33,7 +33,7 @@ test("includes published posts as escaped XML locations", async () => {
   expect(response.headers["content-type"]).toContain("application/xml");
   expect(response.headers["cache-control"]).toContain("max-age=300");
   expect(response.text).toContain(
-    "https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app/blog/public-post&amp;extra",
+    "https://www.sandipkepchhaki.com.np/blog/public-post&amp;extra",
   );
   expect(response.text).toContain("<lastmod>2026-01-01T00:00:00.000Z</lastmod>");
 });

@@ -74,6 +74,7 @@ test("accepts an explicit list of exact HTTPS frontend origins in production", (
   const result = loadEnv({
     NODE_ENV: "production",
     CORS_ORIGINS: [
+      "https://www.sandipkepchhaki.com.np",
       "https://my-portfolio-m3bc-pink.vercel.app",
       "https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app",
     ].join(","),

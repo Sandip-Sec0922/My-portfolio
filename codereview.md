@@ -39,7 +39,7 @@
 - `/api/health` now checks live MongoDB and Redis connectivity for Render; `/api/health/live` reports process liveness.
 - Atlas contact-message persistence is present, but a live connection must be confirmed after deployment configuration.
 - `render.yaml` defines free Render plans. Expect API cold starts and ephemeral Key Value state; Redis restarts can invalidate sessions and counters.
-- `client/vercel.json` targets the live API at `my-portfolio-tlnr.onrender.com`. The active Vercel deployment URL is temporarily used as the canonical and allowed CORS origin.
+- `client/vercel.json` targets the live API at `my-portfolio-tlnr.onrender.com`. The canonical frontend origin is `https://www.sandipkepchhaki.com.np`; the Render CORS allowlist includes the custom domain and existing Vercel aliases.
 - The Atlas password previously shared in conversation must be rotated before production use. Never repeat it in logs, docs, or commits.
 - The actual Render service, Atlas network access, Vercel project root, production rewrite, proxy-hop count, and CORS origins have not been live-validated by this code review.
 

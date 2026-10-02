@@ -42,7 +42,7 @@ const schema = z
     PUBLIC_SITE_URL: z
       .string()
       .url()
-      .default("https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app")
+      .default("https://www.sandipkepchhaki.com.np")
       .refine((value) => {
         const url = new URL(value);
         return (

@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /server
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]     # one PR for routine bumps instead of ten
+    ignore:
+      # Express 5 changes req.query semantics that express-mongo-sanitize and the validate
+      # middleware rely on. Upgrade deliberately, not via a bot PR.
+      - dependency-name: express
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: npm
+    directory: /client
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Tailwind 4 replaces tailwind.config.js and the PostCSS setup. Migrate on purpose.
+      - dependency-name: tailwindcss
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: docker
+    directories: [/server, /nginx]
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }

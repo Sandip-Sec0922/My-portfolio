@@ -11,4 +11,6 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged:stable-alpine
 COPY Nginx/nginx.conf /etc/nginx/nginx.conf
 COPY --from=client-build /app/dist /usr/share/nginx/html
+USER 101
 EXPOSE 8080
+

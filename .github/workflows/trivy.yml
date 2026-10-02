@@ -1,0 +1,51 @@
+name: Trivy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '5 5 * * 3'      # weekly: base images get new CVEs without any commit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    name: Dockerfile misconfiguration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+
+  images:
+    name: Image scan (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: api,   file: server/Dockerfile, context: server }
+          - { name: nginx, file: nginx/Dockerfile,  context: . }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build image
+        run: docker build -f ${{ matrix.file }} -t soc-${{ matrix.name }}:ci ${{ matrix.context }}
+      - uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: soc-${{ matrix.name }}:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true     # only fail on CVEs that have a patch you can actually apply
+          exit-code: '1'

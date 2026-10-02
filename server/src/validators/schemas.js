@@ -25,12 +25,11 @@ const text = ({ min = 1, max, multiline = false }) => {
 };
 
 const email = z.string().trim().toLowerCase().email().max(254);
+// eslint-disable-next-line security/detect-unsafe-regex -- hyphen-delimited segments are unambiguous (linear time)
 const slug = z
   .string()
   .min(1)
   .max(80)
-  // The bounded slug grammar is linear in the input length.
-  // eslint-disable-next-line security/detect-unsafe-regex
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Lowercase letters, numbers, hyphens");
 const tag = z
   .string()

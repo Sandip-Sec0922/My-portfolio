@@ -1,0 +1,8 @@
+title = "soc-portfolio gitleaks config"
+
+[extend]
+useDefault = true     # keep all the built-in rules
+
+[allowlist]
+description = "Documented placeholders only. Real .env files are git-ignored."
+paths = ['''(^|/)\.env\.example$''']

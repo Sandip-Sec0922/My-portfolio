@@ -51,11 +51,9 @@ async function main() {
         ? "Initial admin created. Unset the one-time bootstrap environment variables.\n"
         : "An admin already exists; no changes made.\n",
     );
-  } catch {
-    console.error(
-      "Admin bootstrap failed. Check the environment, database connectivity, and whether an admin already exists; credentials were not logged.",
-    );
-    process.exitCode = 1;
+  } catch (err) {
+    console.error("Bootstrap error:", err);
+    process.exit(1);
   }
 }
 

@@ -63,6 +63,55 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
 
 Upstash is used as an external Redis-compatible service because Render's free web service runs one container and the backend requires Redis for authentication sessions, rate limiting, lockout, revocation, and caching. Configure its TLS connection URL as `REDIS_URL`; never run Redis as a sidecar or put its credentials in the image.
 
+## Admin portal access
+
+The admin portal is part of the Vercel frontend; it is not a separate Render page or subdomain. Open:
+
+```text
+https://<your-active-vercel-domain>/admin/login
+```
+
+After login, `/admin` redirects to `/admin/projects`. The browser presents the login form there; enter the email and password for the admin account created with `npm run admin:bootstrap`. The bootstrap email and password are one-time CLI inputs only. The CLI hashes the password and stores the user in MongoDB Atlas (`User` collection); normal API startup does not read those variables. The admin account therefore survives Render restarts as long as the configured Atlas database remains available.
+
+Authentication is not Basic Auth or a server-side Express session. The API issues short-lived JWT access and refresh tokens in `HttpOnly`, `SameSite=Strict` cookies; refresh sessions and revocations are tracked in Redis. State-changing requests also require the CSRF token/cookie pair managed by the frontend API client. The frontend handles this flow automatically after credentials are submitted.
+
+Frontend routes:
+
+| Browser path | Behavior |
+|---|---|
+| `/admin` | Redirects to `/admin/projects` when authenticated; otherwise the guard sends the user to `/admin/login`. |
+| `/admin/login` | Admin sign-in form. |
+| `/admin/projects` | Manage projects. |
+| `/admin/posts` | Manage blog posts. |
+| `/admin/messages` | View, mark read, and delete contact messages. |
+| `/admin/security` | View the security event log. |
+| `/admin/account` | Change the admin password. |
+
+Protected API routes, all mounted under `/api/admin` and requiring an authenticated admin role, are:
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/admin/projects`, `POST /api/admin/projects` | List/create projects. |
+| `PUT /api/admin/projects/:id`, `DELETE /api/admin/projects/:id` | Update/delete a project. |
+| `GET /api/admin/posts`, `POST /api/admin/posts` | List/create posts. |
+| `GET /api/admin/posts/:id`, `PUT /api/admin/posts/:id`, `DELETE /api/admin/posts/:id` | Read/update/delete a post. |
+| `GET /api/admin/messages` | List contact messages. |
+| `PATCH /api/admin/messages/:id/read`, `DELETE /api/admin/messages/:id` | Mark a message read/delete it. |
+| `GET /api/admin/security-events` | Read paginated security events. |
+
+Related authentication API routes are `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`, and `POST /api/auth/change-password`. The login and admin UI routes are implemented in `client/src/admin/AdminApp.jsx`; the top-level SPA route is in `client/src/App.jsx`. API authentication routes/controllers are in `server/src/routes/auth.js` and `server/src/controllers/authController.js`; the protected admin API routes are in `server/src/routes/admin.js`.
+
+There is no public first-run setup page or automatic seed admin. Run `npm run admin:bootstrap` once from a trusted machine or an available Render Shell, against the production Atlas database. The CLI returns successfully without changing anything when an admin already exists. Keep `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` out of the running API service’s environment; `server/src/config/env.js` intentionally refuses to start if either is present.
+
+### Admin portal verification
+
+1. Confirm the Render API is healthy at `https://<render-host>/api/health` and returns `"status":"ready"` with both dependencies true.
+2. Run `npm run admin:bootstrap` once with the intended email, strong password, and production `MONGO_URI`. Confirm the CLI reports that it created the admin (or reports an existing admin on a safe rerun). Unset the bootstrap variables afterward.
+3. Ensure the Vercel production deployment is publicly accessible (disable Vercel Deployment Protection for Production if it intercepts public visitors) and its API rewrite points to the actual Render host.
+4. Open `https://<your-active-vercel-domain>/admin/login`, sign in with the bootstrap credentials, and confirm navigation to `/admin/projects`.
+5. Visit `/admin/posts`, `/admin/messages`, `/admin/security`, and `/admin/account`. Confirm the views load. Use **Sign out**, then revisit `/admin`; it should redirect to the login page.
+6. If sign-in or API calls fail, check browser network/console details, the Render logs, the exact production `CORS_ORIGINS` value, and that both MongoDB and Redis are healthy.
+
 ## Deploying to Vercel and Atlas
 
 ### Vercel frontend

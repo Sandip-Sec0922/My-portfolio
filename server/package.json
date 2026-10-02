@@ -10,6 +10,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "admin:bootstrap": "node scripts/bootstrap-admin.js",
+    "admin:reset-password": "node scripts/reset-admin-password.js",
     "test": "jest --runInBand",
     "lint": "eslint . --max-warnings 0"
   },

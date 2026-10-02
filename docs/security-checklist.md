@@ -24,7 +24,7 @@ Use this checklist before and after deploying the Vercel + Render + Atlas config
 
 - [ ] Create the API service from `render.yaml`; configure Atlas and external Redis URLs.
 - [ ] Set `MONGO_URI`, `REDIS_URL`, `CORS_ORIGINS`, and three distinct signing secrets (32+ characters).
-- [ ] Configure SMTP credentials and sender/notification address; these are required for admin password reset.
+- [ ] Configure the Resend HTTPS API key and verified sender for admin password reset; Render Free blocks outbound SMTP.
 - [ ] Verify reset OTP email delivery, expiry, single use, and rate limits.
 - [ ] Confirm `/api/health` returns 200 only when MongoDB and Redis are reachable; `/api/health/live` is process liveness only.
 - [ ] Check logs for `api_listening`, MongoDB connection, Redis errors, and failed environment validation; never log secret values.

@@ -63,8 +63,18 @@ const schema = z
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
     NOTIFY_EMAIL: z.string().email().optional(),
+    RESEND_API_KEY: z.string().optional(),
+    RESEND_FROM: z.string().trim().min(3).max(320).optional(),
   })
   .superRefine((e, ctx) => {
+    if (Boolean(e.RESEND_API_KEY) !== Boolean(e.RESEND_FROM)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [e.RESEND_API_KEY ? "RESEND_FROM" : "RESEND_API_KEY"],
+        message: "RESEND_API_KEY and RESEND_FROM must be configured together",
+      });
+    }
+
     if (
       new Set([e.JWT_ACCESS_SECRET, e.JWT_REFRESH_SECRET, e.CSRF_SECRET])
         .size !== 3
@@ -158,5 +168,9 @@ module.exports = Object.freeze({
     user: e.SMTP_USER,
     pass: e.SMTP_PASS,
     notifyEmail: e.NOTIFY_EMAIL,
+  },
+  resend: {
+    apiKey: e.RESEND_API_KEY,
+    from: e.RESEND_FROM,
   },
 });

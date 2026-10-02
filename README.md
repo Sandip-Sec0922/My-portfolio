@@ -46,9 +46,10 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
    - `REDIS_URL`: `<Upstash Redis TLS URL, beginning rediss://>`
    - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CSRF_SECRET`: three distinct generated random strings, each at least 32 characters
    - `CORS_ORIGINS` and `PUBLIC_SITE_URL` are set by the Blueprint to `https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app` for now. When you receive the custom domain, update both to that canonical HTTPS origin.
-   - Optional: `TURNSTILE_SECRET`; configure SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `NOTIFY_EMAIL`) for admin password recovery. `SMTP_PORT` defaults to `587`.
+   - Optional: `TURNSTILE_SECRET`; when enabled, also set the matching public `VITE_TURNSTILE_SITE_KEY` in Vercel and redeploy the frontend. The public site key does not belong in Render.
+   - Configure Resend (`RESEND_API_KEY`, `RESEND_FROM`) for admin password recovery. Resend requires a domain you own and have verified; use a sender address on that domain. Set `NOTIFY_EMAIL` to the inbox that should receive contact-form alerts. Contact messages are stored in MongoDB independently of email delivery. Render's free web services block SMTP ports 25, 465, and 587, so SMTP will not work there.
 3. Deploy the Blueprint and wait for the service health check to pass. Render supplies `PORT`; the API defaults to `10000` if run outside Render.
-4. Configure valid SMTP settings (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `NOTIFY_EMAIL`) in Render. SMTP is required for admin password-reset codes.
+4. Verify a domain you own in Resend, then configure `RESEND_API_KEY` and `RESEND_FROM` (for example, `Portfolio <no-reply@mail.yourdomain.com>`) in Render. Email is sent to the address on the admin account. The Resend API uses HTTPS; do not use Gmail SMTP on Render's free plan because outbound SMTP ports are blocked.
 5. Test the public service: `curl.exe -i https://<render-service-host>/api/health` should return HTTP 200 with `{"status":"ready","dependencies":{"mongo":true,"redis":true}}`. Copy the final `https://<render-service-host>` URL from the Render service's dashboard for the Vercel rewrite destination.
 
 Upstash is used as an external Redis-compatible service because Render's free web service runs one container and the backend requires Redis for authentication sessions, rate limiting, lockout, revocation, and caching. Configure its TLS connection URL as `REDIS_URL`; never run Redis as a sidecar or put its credentials in the image.
@@ -92,15 +93,15 @@ Protected API routes, all mounted under `/api/admin` and requiring an authentica
 
 Related authentication API routes are `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/change-password`, `POST /api/auth/password-reset/request`, and `POST /api/auth/password-reset/complete`. The signed-out reset sends a six-digit code to the email stored on the admin account. Codes are valid for 10 minutes, are single-use, and allow at most five attempts; requests and verification are rate-limited. The login and admin UI routes are implemented in `client/src/admin/AdminApp.jsx`; the top-level SPA route is in `client/src/App.jsx`. API authentication routes/controllers are in `server/src/routes/auth.js` and `server/src/controllers/authController.js`; reset logic is in `server/src/services/adminPasswordResetService.js`; the protected admin API routes are in `server/src/routes/admin.js`.
 
-There is no public registration or first-run admin creation endpoint. Keep SMTP configured so the existing admin can recover access from `/admin/reset-password`. A successful reset revokes refresh sessions and clears login lockout state.
+There is no public registration or first-run admin creation endpoint. Keep Resend configured so the existing admin can recover access from `/admin/reset-password`. A successful reset revokes refresh sessions and clears login lockout state.
 
 ### Admin portal verification
 
 1. Confirm the Render API is healthy at `https://<render-host>/api/health` and returns `"status":"ready"` with both dependencies true.
-2. Ensure Render has working SMTP environment variables; request a reset code from `/admin/reset-password` and check the existing admin mailbox (and spam folder).
+2. Ensure Render has `RESEND_API_KEY` and a verified `RESEND_FROM` sender; request a reset code from `/admin/reset-password` and check the existing admin account's mailbox (and spam folder). If no admin user exists in Atlas, the privacy-preserving response is the same but no code is sent; there is deliberately no public account-creation endpoint.
 3. Submit the current six-digit code and a new 14–128-character password. Sign in at `/admin/login` and confirm navigation to `/admin/projects`.
 4. Visit `/admin/posts`, `/admin/messages`, `/admin/security`, and `/admin/account`. Confirm the views load. Use **Sign out**, then revisit `/admin`; it should redirect to the login page.
-5. If reset email or login fails, check browser network/console details, Render logs, SMTP settings, exact production `CORS_ORIGINS`, and MongoDB/Redis health.
+5. If reset email or login fails, check browser network/console details, Render logs, Resend sender/domain verification, exact production `CORS_ORIGINS`, and MongoDB/Redis health.
 
 ## Deploying to Vercel and Atlas
 
@@ -109,7 +110,7 @@ There is no public registration or first-run admin creation endpoint. Keep SMTP 
 1. Import the repository as a Vercel project and set **Root Directory** to `client`; use the Vite preset.
 2. `client/vercel.json` contains the install/build settings, SPA fallback, security headers, API rewrite, and dynamic sitemap rewrite.
 3. The API and sitemap rewrites target the live API at `https://my-portfolio-tlnr.onrender.com`.
-4. Set `VITE_TURNSTILE_SITE_KEY` in Vercel only if Turnstile is enabled. `VITE_*` values are public and must never contain secrets.
+4. Set `VITE_TURNSTILE_SITE_KEY` in Vercel only if Turnstile is enabled; set the corresponding `TURNSTILE_SECRET` in Render. Configure both values or leave both unset. `VITE_*` values are public and must never contain secrets.
 
 ### MongoDB Atlas
 

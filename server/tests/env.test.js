@@ -72,3 +72,13 @@ test("accepts one exact HTTPS frontend origin in production", () => {
 
   expect(result.status).toBe(0);
 });
+
+test("requires Resend API key and sender to be configured together", () => {
+  const result = loadEnv({
+    RESEND_API_KEY: "resend-test-key",
+    RESEND_FROM: "",
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("RESEND_FROM");
+});

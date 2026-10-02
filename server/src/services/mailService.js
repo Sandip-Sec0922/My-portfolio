@@ -30,13 +30,58 @@ async function getTransport() {
   return transportPromise;
 }
 
+async function sendWithResend({ to, subject, text, replyTo }) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.resend.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: config.resend.from,
+      to: [to],
+      subject,
+      text,
+      ...(replyTo && { reply_to: replyTo }),
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    const error = new Error(
+      `Resend API responded ${response.status}: ${String(result.message || result.name || "email request failed").slice(0, 200)}`,
+    );
+    error.code = result.name;
+    error.responseCode = response.status;
+    throw error;
+  }
+}
+
+async function sendEmail({ to, subject, text, replyTo }) {
+  if (config.resend.apiKey && config.resend.from)
+    return sendWithResend({ to, subject, text, replyTo });
+
+  const t = await getTransport();
+  if (!t) throw new Error("Email delivery is not configured");
+  return t.sendMail({
+    from: config.smtp.user || config.smtp.notifyEmail,
+    to,
+    replyTo,
+    subject,
+    text,
+  });
+}
+
 // Plain-text only (no HTML body) -> no HTML/script injection into your mail client.
 // Visitor-supplied name goes in the body, never a header; subject/email are already validated single-line.
 async function notifyNewMessage(msg) {
-  const t = await getTransport();
-  if (!t) return;
-  await t.sendMail({
-    from: config.smtp.user || config.smtp.notifyEmail,
+  if (
+    !config.smtp.notifyEmail ||
+    (!(config.resend.apiKey && config.resend.from) &&
+      !(config.smtp.host && config.smtp.notifyEmail))
+  )
+    return;
+  await sendEmail({
     to: config.smtp.notifyEmail,
     replyTo: msg.email,
     subject: `[Portfolio] ${msg.subject}`,
@@ -45,10 +90,7 @@ async function notifyNewMessage(msg) {
 }
 
 async function sendAdminPasswordResetOtp(email, otp) {
-  const t = await getTransport();
-  if (!t) throw new Error("SMTP is not configured");
-  await t.sendMail({
-    from: config.smtp.user || config.smtp.notifyEmail,
+  await sendEmail({
     to: email,
     subject: "Admin password reset code",
     text: `Your admin password reset code is ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`,
@@ -56,7 +98,10 @@ async function sendAdminPasswordResetOtp(email, otp) {
 }
 
 const canSendPasswordReset = () =>
-  Boolean(config.smtp.host && config.smtp.notifyEmail);
+  Boolean(
+    (config.resend.apiKey && config.resend.from) ||
+      (config.smtp.host && config.smtp.notifyEmail),
+  );
 
 module.exports = {
   notifyNewMessage,

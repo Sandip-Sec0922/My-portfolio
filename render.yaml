@@ -21,23 +21,25 @@ projects:
             plan: free
             # Environment variables whose values are supplied in Render.
             envVars:
-              # Public Turnstile site key used by the frontend integration.
-              - key: TURNSTILE_SITE_KEY
-                # Ask for this value during initial Blueprint creation.
-                sync: false
-              # Verified sender/notification address; required for admin reset-code email.
+              # Destination for contact-form email notifications; optional with the message inbox.
               - key: NOTIFY_EMAIL
                 sync: false
-              # SMTP authentication password; required for admin reset-code email.
+              # Resend API key; use HTTPS email delivery on the free Render plan.
+              - key: RESEND_API_KEY
+                sync: false
+              # Verified sender address, e.g. Portfolio <no-reply@your-verified-domain>.
+              - key: RESEND_FROM
+                sync: false
+              # Optional SMTP fallback password; Render Free blocks outbound SMTP ports.
               - key: SMTP_PASS
                 sync: false
-              # SMTP authentication username; required for admin reset-code email.
+              # Optional SMTP fallback username; Render Free blocks outbound SMTP ports.
               - key: SMTP_USER
                 sync: false
-              # SMTP server hostname; required for admin reset-code email.
+              # Optional SMTP fallback host; Render Free blocks outbound SMTP ports.
               - key: SMTP_HOST
                 sync: false
-              # SMTP port; defaults to 587 (STARTTLS) when not set.
+              # Optional SMTP fallback port; defaults to 587 (STARTTLS).
               - key: SMTP_PORT
                 value: "587"
               # Cloudflare Turnstile server-side secret.

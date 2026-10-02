@@ -49,6 +49,14 @@ module.exports = {
     skipSuccessfulRequests: true,
   }),
   refreshLimiter: make("refresh", { windowMs: 15 * 60 * 1000, limit: 30 }),
+  passwordResetRequestLimiter: make("password-reset-request", {
+    windowMs: 60 * 60 * 1000,
+    limit: 5,
+  }),
+  passwordResetConfirmLimiter: make("password-reset-confirm", {
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+  }),
   contactLimiter: make("contact", { windowMs: 60 * 60 * 1000, limit: 5 }),
   adminLimiter: make("admin", { windowMs: 15 * 60 * 1000, limit: 200 }),
 };

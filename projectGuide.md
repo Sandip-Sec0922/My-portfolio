@@ -65,7 +65,7 @@ docs/              Security checklist and threat model
 | Secrets | Ignored local `.env` | Render secret environment variables |
 | Public API path | Vite proxy `/api` | Vercel same-origin rewrite `/api/*` |
 
-Use `.env.example` as a variable-name reference only. Replace all `change_me...` placeholders. Generate three distinct signing secrets of at least 32 characters. Bootstrap the initial admin once with `npm run admin:bootstrap` from a trusted machine; do not set bootstrap credentials on the running API service. Do not print, commit, email, or paste secrets into tickets or chat.
+Use `.env.example` as a variable-name reference only. Replace all `change_me...` placeholders. Generate three distinct signing secrets of at least 32 characters. There is no bootstrap CLI or public admin-registration route; configure SMTP for the admin's email-based password recovery. Do not print, commit, email, or paste secrets into tickets or chat.
 
 The database URI must use the least-privilege application account and identify the intended database. URL-encode URI-reserved password characters. Rotate credentials that have been exposed, and only configure replacement credentials through ignored local files or provider secret stores.
 

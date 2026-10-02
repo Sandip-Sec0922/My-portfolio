@@ -46,19 +46,9 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
    - `REDIS_URL`: `<Upstash Redis TLS URL, beginning rediss://>`
    - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CSRF_SECRET`: three distinct generated random strings, each at least 32 characters
    - `CORS_ORIGINS` and `PUBLIC_SITE_URL` are set by the Blueprint to `https://my-portfolio-m3bc-i25ems9w5-sandip-80b8.vercel.app` for now. When you receive the custom domain, update both to that canonical HTTPS origin.
-   - Optional: `TURNSTILE_SECRET`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `NOTIFY_EMAIL`
-3. Deploy the Blueprint and wait for the service health check to pass. Render supplies `PORT`; the API defaults to `10000` if run outside Render. Do not set the admin bootstrap variables on the running service.
-4. Create the first admin once from a trusted machine that can reach Atlas. In PowerShell, from the repository root, set the variables only for the current shell, run the CLI, and remove them:
-   ```powershell
-   Set-Location server
-   $env:MONGO_URI = '<Atlas connection string>'
-   $env:ADMIN_BOOTSTRAP_EMAIL = '<admin email>'
-   $env:ADMIN_BOOTSTRAP_PASSWORD = '<unique password, at least 14 characters>'
-   npm ci
-   npm run admin:bootstrap
-   Remove-Item Env:MONGO_URI, Env:ADMIN_BOOTSTRAP_EMAIL, Env:ADMIN_BOOTSTRAP_PASSWORD
-   ```
-   The CLI creates the admin only if none exists; reruns exit successfully without changing an existing admin. It never logs the password. Never save these bootstrap variables in Render or commit them.
+   - Optional: `TURNSTILE_SECRET`; configure SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `NOTIFY_EMAIL`) for admin password recovery. `SMTP_PORT` defaults to `587`.
+3. Deploy the Blueprint and wait for the service health check to pass. Render supplies `PORT`; the API defaults to `10000` if run outside Render.
+4. Configure valid SMTP settings (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `NOTIFY_EMAIL`) in Render. SMTP is required for admin password-reset codes.
 5. Test the public service: `curl.exe -i https://<render-service-host>/api/health` should return HTTP 200 with `{"status":"ready","dependencies":{"mongo":true,"redis":true}}`. Copy the final `https://<render-service-host>` URL from the Render service's dashboard for the Vercel rewrite destination.
 
 Upstash is used as an external Redis-compatible service because Render's free web service runs one container and the backend requires Redis for authentication sessions, rate limiting, lockout, revocation, and caching. Configure its TLS connection URL as `REDIS_URL`; never run Redis as a sidecar or put its credentials in the image.
@@ -71,7 +61,7 @@ The admin portal is part of the Vercel frontend; it is not a separate Render pag
 https://<your-active-vercel-domain>/admin/login
 ```
 
-After login, `/admin` redirects to `/admin/projects`. The browser presents the login form there; enter the email and password for the admin account created with `npm run admin:bootstrap`. The bootstrap email and password are one-time CLI inputs only. The CLI hashes the password and stores the user in MongoDB Atlas (`User` collection); normal API startup does not read those variables. The admin account therefore survives Render restarts as long as the configured Atlas database remains available.
+After login, `/admin` redirects to `/admin/projects`. The browser presents the login form there; enter the existing admin account email and password. The admin account is stored in MongoDB Atlas (`User` collection) and persists across Render restarts.
 
 Authentication is not Basic Auth or a server-side Express session. The API issues short-lived JWT access and refresh tokens in `HttpOnly`, `SameSite=Strict` cookies; refresh sessions and revocations are tracked in Redis. State-changing requests also require the CSRF token/cookie pair managed by the frontend API client. The frontend handles this flow automatically after credentials are submitted.
 
@@ -86,6 +76,7 @@ Frontend routes:
 | `/admin/messages` | View, mark read, and delete contact messages. |
 | `/admin/security` | View the security event log. |
 | `/admin/account` | Change the admin password. |
+| `/admin/reset-password` | Request an email code and reset the admin password when signed out. |
 
 Protected API routes, all mounted under `/api/admin` and requiring an authenticated admin role, are:
 
@@ -99,18 +90,17 @@ Protected API routes, all mounted under `/api/admin` and requiring an authentica
 | `PATCH /api/admin/messages/:id/read`, `DELETE /api/admin/messages/:id` | Mark a message read/delete it. |
 | `GET /api/admin/security-events` | Read paginated security events. |
 
-Related authentication API routes are `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`, and `POST /api/auth/change-password`. The login and admin UI routes are implemented in `client/src/admin/AdminApp.jsx`; the top-level SPA route is in `client/src/App.jsx`. API authentication routes/controllers are in `server/src/routes/auth.js` and `server/src/controllers/authController.js`; the protected admin API routes are in `server/src/routes/admin.js`.
+Related authentication API routes are `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/change-password`, `POST /api/auth/password-reset/request`, and `POST /api/auth/password-reset/complete`. The signed-out reset sends a six-digit code to the email stored on the admin account. Codes are valid for 10 minutes, are single-use, and allow at most five attempts; requests and verification are rate-limited. The login and admin UI routes are implemented in `client/src/admin/AdminApp.jsx`; the top-level SPA route is in `client/src/App.jsx`. API authentication routes/controllers are in `server/src/routes/auth.js` and `server/src/controllers/authController.js`; reset logic is in `server/src/services/adminPasswordResetService.js`; the protected admin API routes are in `server/src/routes/admin.js`.
 
-There is no public first-run setup page or automatic seed admin. Run `npm run admin:bootstrap` once from a trusted machine or an available Render Shell, against the production Atlas database. The CLI returns successfully without changing anything when an admin already exists. Keep `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` out of the running API service’s environment; `server/src/config/env.js` intentionally refuses to start if either is present.
+There is no public registration or first-run admin creation endpoint. Keep SMTP configured so the existing admin can recover access from `/admin/reset-password`. A successful reset revokes refresh sessions and clears login lockout state.
 
 ### Admin portal verification
 
 1. Confirm the Render API is healthy at `https://<render-host>/api/health` and returns `"status":"ready"` with both dependencies true.
-2. Run `npm run admin:bootstrap` once with the intended email, strong password, and production `MONGO_URI`. Confirm the CLI reports that it created the admin (or reports an existing admin on a safe rerun). Unset the bootstrap variables afterward.
-3. Ensure the Vercel production deployment is publicly accessible (disable Vercel Deployment Protection for Production if it intercepts public visitors) and its API rewrite points to the actual Render host.
-4. Open `https://<your-active-vercel-domain>/admin/login`, sign in with the bootstrap credentials, and confirm navigation to `/admin/projects`.
-5. Visit `/admin/posts`, `/admin/messages`, `/admin/security`, and `/admin/account`. Confirm the views load. Use **Sign out**, then revisit `/admin`; it should redirect to the login page.
-6. If sign-in or API calls fail, check browser network/console details, the Render logs, the exact production `CORS_ORIGINS` value, and that both MongoDB and Redis are healthy.
+2. Ensure Render has working SMTP environment variables; request a reset code from `/admin/reset-password` and check the existing admin mailbox (and spam folder).
+3. Submit the current six-digit code and a new 14–128-character password. Sign in at `/admin/login` and confirm navigation to `/admin/projects`.
+4. Visit `/admin/posts`, `/admin/messages`, `/admin/security`, and `/admin/account`. Confirm the views load. Use **Sign out**, then revisit `/admin`; it should redirect to the login page.
+5. If reset email or login fails, check browser network/console details, Render logs, SMTP settings, exact production `CORS_ORIGINS`, and MongoDB/Redis health.
 
 ## Deploying to Vercel and Atlas
 

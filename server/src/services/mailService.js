@@ -32,4 +32,22 @@ async function notifyNewMessage(msg) {
   });
 }
 
-module.exports = { notifyNewMessage };
+async function sendAdminPasswordResetOtp(email, otp) {
+  const t = getTransport();
+  if (!t) throw new Error("SMTP is not configured");
+  await t.sendMail({
+    from: config.smtp.user || config.smtp.notifyEmail,
+    to: email,
+    subject: "Admin password reset code",
+    text: `Your admin password reset code is ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`,
+  });
+}
+
+const canSendPasswordReset = () =>
+  Boolean(config.smtp.host && config.smtp.notifyEmail);
+
+module.exports = {
+  notifyNewMessage,
+  sendAdminPasswordResetOtp,
+  canSendPasswordReset,
+};

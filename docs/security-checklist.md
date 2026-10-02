@@ -20,12 +20,12 @@ Use this checklist before and after deploying the Vercel + Render + Atlas config
 - [ ] Test the deployed security headers, SPA fallback, all public routes, and custom-domain HTTPS.
 - [ ] Confirm CORS origins in Render exactly match the production Vercel/custom-domain origins.
 
-## 3. Render API and Key Value
+## 3. Render API and external services
 
-- [ ] Create the services from `render.yaml`; confirm both services are in the same region and Key Value is private.
-- [ ] Set `MONGO_URI`, `CORS_ORIGINS`, three distinct signing secrets (32+ characters), and bootstrap-admin credentials.
-- [ ] Configure optional Turnstile server secret, SMTP credentials, and notification address only when used.
-- [ ] Remove bootstrap-admin environment variables after initial setup and password change.
+- [ ] Create the API service from `render.yaml`; configure Atlas and external Redis URLs.
+- [ ] Set `MONGO_URI`, `REDIS_URL`, `CORS_ORIGINS`, and three distinct signing secrets (32+ characters).
+- [ ] Configure SMTP credentials and sender/notification address; these are required for admin password reset.
+- [ ] Verify reset OTP email delivery, expiry, single use, and rate limits.
 - [ ] Confirm `/api/health` returns 200 only when MongoDB and Redis are reachable; `/api/health/live` is process liveness only.
 - [ ] Check logs for `api_listening`, MongoDB connection, Redis errors, and failed environment validation; never log secret values.
 - [ ] Measure the client IP observed by the API and spoof-test a supplied `X-Forwarded-For` before increasing `TRUST_PROXY_HOPS`.

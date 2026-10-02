@@ -36,6 +36,7 @@ async function recordFailure(email) {
   return false;
 }
 
-const clear = (email) => redis.del(`login:fail:${id(email)}`);
+const clear = (email) =>
+  redis.del(`login:fail:${id(email)}`, `login:lock:${id(email)}`);
 
 module.exports = { isLocked, recordFailure, clear };

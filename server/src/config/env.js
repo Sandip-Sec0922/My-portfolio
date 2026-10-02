@@ -6,17 +6,6 @@ const raw = Object.fromEntries(
   Object.entries(process.env).filter(([, v]) => v !== ""),
 );
 
-const bootstrapVariables = [
-  "ADMIN_BOOTSTRAP_EMAIL",
-  "ADMIN_BOOTSTRAP_PASSWORD",
-].filter((key) => process.env[key]);
-if (bootstrapVariables.length) {
-  console.error(
-    `${bootstrapVariables.join(", ")} must not be set on the API service; use npm run admin:bootstrap once instead.`,
-  );
-  process.exit(1);
-}
-
 function isProductionOrigin(origin) {
   try {
     const url = new URL(origin);

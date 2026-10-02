@@ -14,9 +14,6 @@ const validEnv = {
 function loadEnv(overrides = {}) {
   const env = { ...process.env, ...validEnv, ...overrides };
   if (!Object.hasOwn(overrides, "PORT")) delete env.PORT;
-  ["ADMIN_BOOTSTRAP_EMAIL", "ADMIN_BOOTSTRAP_PASSWORD"].forEach((key) => {
-    if (!Object.hasOwn(overrides, key)) delete env[key];
-  });
   return spawnSync(
     process.execPath,
     ["-e", "const e=require('./src/config/env'); console.log(JSON.stringify({port:e.port}))"],
@@ -73,14 +70,4 @@ test("accepts one exact HTTPS frontend origin in production", () => {
   });
 
   expect(result.status).toBe(0);
-});
-
-test("refuses bootstrap credentials in the running API environment", () => {
-  const result = loadEnv({
-    ADMIN_BOOTSTRAP_PASSWORD: "a-temporary-password-for-cli-only",
-  });
-
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain("ADMIN_BOOTSTRAP_PASSWORD");
-  expect(result.stderr).not.toContain("a-temporary-password-for-cli-only");
 });

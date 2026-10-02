@@ -19,6 +19,7 @@ const INTERNAL_EVENT_TYPES = [
   "admin_update",
   "admin_delete",
   "password_changed",
+  "password_reset",
 ];
 
 module.exports = {

@@ -27,7 +27,11 @@ const clean = (d) =>
 
 async function persist(type, ctx, details) {
   const sanitizedDetails = clean(details);
-  if (type.startsWith("admin_") || type === "password_changed") {
+  if (
+    type.startsWith("admin_") ||
+    type === "password_changed" ||
+    type === "password_reset"
+  ) {
     await SecurityEvent.create({
       type,
       ip: ctx.ip,

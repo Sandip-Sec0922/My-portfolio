@@ -71,6 +71,15 @@ const loginSchema = z
   .object({ email, password: z.string().min(1).max(128) })
   .strict(); // max 128 bounds argon2 CPU/memory use
 
+const passwordResetRequestSchema = z.object({ email }).strict();
+const passwordResetSchema = z
+  .object({
+    email,
+    otp: z.string().regex(/^\d{6}$/),
+    newPassword: z.string().min(14).max(128),
+  })
+  .strict();
+
 const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1).max(128),
@@ -129,6 +138,8 @@ const postBase = z
 
 module.exports = {
   loginSchema,
+  passwordResetRequestSchema,
+  passwordResetSchema,
   changePasswordSchema,
   contactSchema,
   projectSchema: projectBase,

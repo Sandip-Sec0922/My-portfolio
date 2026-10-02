@@ -25,18 +25,21 @@ projects:
               - key: TURNSTILE_SITE_KEY
                 # Ask for this value during initial Blueprint creation.
                 sync: false
-              # Destination address for contact notifications.
+              # Verified sender/notification address; required for admin reset-code email.
               - key: NOTIFY_EMAIL
                 sync: false
-              # SMTP authentication password.
+              # SMTP authentication password; required for admin reset-code email.
               - key: SMTP_PASS
                 sync: false
-              # SMTP authentication username.
+              # SMTP authentication username; required for admin reset-code email.
               - key: SMTP_USER
                 sync: false
-              # SMTP server hostname.
+              # SMTP server hostname; required for admin reset-code email.
               - key: SMTP_HOST
                 sync: false
+              # SMTP port; defaults to 587 (STARTTLS) when not set.
+              - key: SMTP_PORT
+                value: "587"
               # Cloudflare Turnstile server-side secret.
               - key: TURNSTILE_SECRET
                 sync: false

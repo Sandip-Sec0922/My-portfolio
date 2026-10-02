@@ -87,13 +87,13 @@ Use the smallest relevant test suite during iteration, then run the full API tes
 
 - Create a Vercel project from the repository with **Root Directory** `client` and the Vite framework preset.
 - `client/vercel.json` defines `npm ci`, `npm run build`, `dist`, the SPA fallback, headers, and same-origin rewrites.
-- The API and sitemap rewrite destinations currently use `soc-portfolio-api.onrender.com`. Verify the actual Render URL and update the two rewrite destinations if the provider assigns another hostname.
+- The API and sitemap rewrites target `my-portfolio-tlnr.onrender.com`. The temporary Vercel frontend origin is configured as the production CORS and canonical origin until the custom domain is active.
 - Set the public `VITE_TURNSTILE_SITE_KEY` only when enabling Turnstile. Never put a secret in the frontend environment.
 
 ### Render
 
 - Create a Blueprint from `render.yaml`; it provisions one API web service only. Configure Atlas and external Redis through `MONGO_URI` and `REDIS_URL`. The Render readiness check is `/api/health`.
-- Set all `sync: false` values in Render. Required values include `MONGO_URI`, the three signing secrets, `CORS_ORIGINS`, and bootstrap admin credentials. Optional mail and Turnstile settings are listed in `.env.example`.
+- Set all `sync: false` values in Render. Required values include `MONGO_URI`, `REDIS_URL`, and the three signing secrets. `CORS_ORIGINS` and `PUBLIC_SITE_URL` currently use the active Vercel deployment origin; change both when the custom domain is active.
 - The Blueprint uses free plans: Render may sleep the API after inactivity, and free Key Value is ephemeral. Redis restart/eviction clears active sessions and rate-limit counters. Choose paid plans if continuous uptime or persistent Redis state is required.
 - After creating and changing the bootstrap admin password, remove the bootstrap email/password environment variables.
 - Confirm `/api/health` returns 200 only when MongoDB and Redis can be pinged.

@@ -1,4 +1,4 @@
 Contact: mailto:sarunmgr77@gmail.com
-Policy: https://sandipkepchhaki.com.np/security
+Policy: https://my-portfolio-m3bc-i25ems9w5-sandip-80b8.vercel.app/security
 Preferred-Languages: en
 Expires: 2027-10-01T00:00:00.000Z

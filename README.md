@@ -45,7 +45,7 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
    - `MONGO_URI`: `<Atlas connection string for a least-privilege application user>`
    - `REDIS_URL`: `<Upstash Redis TLS URL, beginning rediss://>`
    - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CSRF_SECRET`: three distinct generated random strings, each at least 32 characters
-   - `CORS_ORIGINS`: `https://<your-vercel-frontend-host>` (one exact HTTPS origin, no path or trailing slash)
+   - `CORS_ORIGINS` and `PUBLIC_SITE_URL` are set by the Blueprint to `https://my-portfolio-m3bc-i25ems9w5-sandip-80b8.vercel.app` for now. When you receive the custom domain, update both to that canonical HTTPS origin.
    - Optional: `TURNSTILE_SECRET`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `NOTIFY_EMAIL`
 3. Deploy the Blueprint and wait for the service health check to pass. Render supplies `PORT`; the API defaults to `10000` if run outside Render. Do not set the admin bootstrap variables on the running service.
 4. Create the first admin once from a trusted machine that can reach Atlas. In PowerShell, from the repository root, set the variables only for the current shell, run the CLI, and remove them:
@@ -69,7 +69,7 @@ Upstash is used as an external Redis-compatible service because Render's free we
 
 1. Import the repository as a Vercel project and set **Root Directory** to `client`; use the Vite preset.
 2. `client/vercel.json` contains the install/build settings, SPA fallback, security headers, API rewrite, and dynamic sitemap rewrite.
-3. The rewrite currently targets `https://soc-portfolio-api.onrender.com`. After creating the Render service, verify its actual public hostname and update both external destinations in `client/vercel.json` if Render assigned a different host.
+3. The API and sitemap rewrites target the live API at `https://my-portfolio-tlnr.onrender.com`.
 4. Set `VITE_TURNSTILE_SITE_KEY` in Vercel only if Turnstile is enabled. `VITE_*` values are public and must never contain secrets.
 
 ### MongoDB Atlas

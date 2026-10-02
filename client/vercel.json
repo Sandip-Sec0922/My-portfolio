@@ -6,11 +6,11 @@
   "rewrites": [
     {
       "source": "/sitemap.xml",
-      "destination": "https://soc-portfolio-api.onrender.com/api/sitemap.xml"
+      "destination": "https://my-portfolio-tlnr.onrender.com/api/sitemap.xml"
     },
     {
       "source": "/api/:path*",
-      "destination": "https://soc-portfolio-api.onrender.com/api/:path*"
+      "destination": "https://my-portfolio-tlnr.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",

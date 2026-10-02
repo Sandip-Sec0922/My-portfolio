@@ -41,12 +41,12 @@ describe("contact schema", () => {
     subject: "Hello there",
     message: "This is a long enough message.",
   };
-  test("strips HTML and script bodies", () => {
+  test("preserves plain-text characters that resemble HTML", () => {
     const out = s.contactSchema.parse({
       ...base,
-      message: "Hi <script>alert(1)</script><b>there</b>, nice portfolio site",
+      message: "I <3 SOC and use <b> as an example in this message.",
     });
-    expect(out.message).not.toMatch(/<|alert/);
+    expect(out.message).toBe("I <3 SOC and use <b> as an example in this message.");
   });
   test("rejects newlines in subject (header injection)", () => {
     expect(
@@ -74,6 +74,12 @@ describe("project schema", () => {
       s.projectSchema.safeParse({
         ...validProject,
         liveUrl: "javascript:alert(1)",
+      }).success,
+    ).toBe(false);
+    expect(
+      s.projectSchema.safeParse({
+        ...validProject,
+        liveUrl: "https://user:password@example.com/private",
       }).success,
     ).toBe(false);
     expect(

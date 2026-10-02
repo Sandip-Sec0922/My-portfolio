@@ -40,9 +40,10 @@ function Turnstile({ onToken }) {
 export default function Contact() {
   usePageTitle("Contact");
   const [form, setForm] = useState(empty);
-  const [website, setWebsite] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
   const [token, setToken] = useState("");
   const [status, setStatus] = useState({ state: "idle" });
+  const [turnstileAttempt, setTurnstileAttempt] = useState(0);
   const onToken = useCallback((value) => setToken(value), []);
   const onChange = (field) => (event) =>
     setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -53,10 +54,11 @@ export default function Contact() {
     try {
       await api.post("/contact", {
         ...form,
-        website,
+        companyWebsite,
         ...(token && { turnstileToken: token }),
       });
       setForm(empty);
+      setCompanyWebsite("");
       setToken("");
       setStatus({ state: "success" });
     } catch (error) {
@@ -70,6 +72,9 @@ export default function Contact() {
             ? "Too many messages. Please wait a while before trying again."
             : `${error.message}${fields ? ` (${fields})` : ""}`,
       });
+    } finally {
+      setToken("");
+      setTurnstileAttempt((attempt) => attempt + 1);
     }
   }
 
@@ -145,10 +150,10 @@ export default function Contact() {
               <p id="message-hint" className="mt-1 text-xs text-slate-500">At least 10 characters. Please don’t include sensitive information.</p>
             </div>
             <div className="absolute -left-[9999px]" aria-hidden="true">
-              <label htmlFor="website">Leave this field empty</label>
-              <input id="website" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} />
+              <label htmlFor="company-website">Leave this field empty</label>
+              <input id="company-website" name="companyWebsite" tabIndex={-1} autoComplete="off" value={companyWebsite} onChange={(event) => setCompanyWebsite(event.target.value)} />
             </div>
-            <Turnstile onToken={onToken} />
+            <Turnstile key={turnstileAttempt} onToken={onToken} />
             {status.state === "error" && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700 dark:text-red-300" role="alert">
                 {status.message}

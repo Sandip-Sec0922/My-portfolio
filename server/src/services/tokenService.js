@@ -9,6 +9,7 @@ const { setAuthCookies } = require("../utils/cookies");
 const { accessSecret, refreshSecret, issuer, accessTtl, refreshTtlSec } =
   config.jwt;
 const ALGS = ["HS256"]; // allowlist on verify; never trust the token's own "alg" header
+const MAX_SESSION_AGE_SEC = 30 * 24 * 60 * 60;
 
 async function execChecked(transaction) {
   const results = await transaction.exec();
@@ -38,10 +39,10 @@ const verifyAccess = (token, extra = {}) =>
   });
 
 // Refresh tokens are tracked server-side (Redis allowlist) so they are single-use and revocable.
-async function signRefresh(user) {
+async function signRefresh(user, authTime) {
   const jti = randomUUID();
   const uid = String(user._id);
-  const token = jwt.sign({}, refreshSecret, {
+  const token = jwt.sign({ authTime }, refreshSecret, {
     algorithm: "HS256",
     subject: uid,
     expiresIn: refreshTtlSec,
@@ -106,7 +107,12 @@ async function consumeRefresh(token) {
     await revokeAllForUser(claims.sub);
     throw new AppError(401, "REFRESH_REUSE", "Session expired");
   }
-  return claims.sub;
+  const authTime = Number.isInteger(claims.authTime) ? claims.authTime : claims.iat;
+  if (Math.floor(Date.now() / 1000) - authTime >= MAX_SESSION_AGE_SEC) {
+    await revokeAllForUser(claims.sub);
+    throw new AppError(401, "UNAUTHENTICATED", "Authentication required");
+  }
+  return { userId: claims.sub, authTime };
 }
 
 async function revokeRefresh(token) {
@@ -132,10 +138,10 @@ async function blacklistAccess(claims) {
 }
 const isBlacklisted = async (jti) => (await redis.exists(`bl:${jti}`)) === 1;
 
-async function issueSession(res, user) {
+async function issueSession(res, user, authTime = Math.floor(Date.now() / 1000)) {
   const [access, refresh] = await Promise.all([
     signAccess(user),
-    signRefresh(user),
+    signRefresh(user, authTime),
   ]);
   setAuthCookies(res, access, refresh);
 }

@@ -16,8 +16,18 @@ const isLocked = async (email) =>
 
 async function recordFailure(email) {
   const h = id(email);
-  const n = await redis.incr(`login:fail:${h}`);
-  if (n === 1) await redis.expire(`login:fail:${h}`, WINDOW_SEC);
+  const results = await redis
+    .multi()
+    .set(`login:fail:${h}`, "0", "EX", WINDOW_SEC, "NX")
+    .incr(`login:fail:${h}`)
+    .exec();
+  if (!Array.isArray(results))
+    throw new Error("Login failure counter transaction did not execute");
+  const failure = results.find(([err]) => err)?.[0];
+  if (failure) throw failure;
+  const n = results[1]?.[1];
+  if (!Number.isInteger(n))
+    throw new Error("Login failure counter returned an invalid value");
   if (n >= MAX_FAILS) {
     await redis.set(`login:lock:${h}`, "1", "EX", LOCK_SEC);
     await redis.del(`login:fail:${h}`);

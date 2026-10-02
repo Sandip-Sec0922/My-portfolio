@@ -50,10 +50,9 @@ export function AuthProvider({ children }) {
     [],
   );
 
-  // Pages call fail(err) in catch blocks: a 401 that survived the refresh attempt means the session is
-  // really gone, so bounce to the login screen. Returns a message to display.
+  // Only authentication failures expire a session; credential errors on account actions must not log out.
   const fail = useCallback((e) => {
-    if (e.status === 401)
+    if (e.status === 401 && e.code === "UNAUTHENTICATED")
       setS({
         status: "out",
         user: null,

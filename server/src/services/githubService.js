@@ -1,4 +1,5 @@
 "use strict";
+const { randomUUID } = require("crypto");
 const config = require("../config/env");
 const redis = require("../config/redis");
 const logger = require("../utils/logger");
@@ -7,6 +8,10 @@ const cache = require("./cacheService");
 
 const API = "https://api.github.com"; // hard-coded host: the token is only ever sent here (no SSRF/token leak)
 const TTL_SEC = 20 * 60;
+const LOCK_SEC = 30;
+const RELEASE_LOCK =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+let refreshPromise;
 
 async function gh(path) {
   const headers = {
@@ -72,15 +77,64 @@ async function build() {
   };
 }
 
+async function buildAndStore() {
+  const data = await build();
+  const serialized = JSON.stringify(data);
+  await Promise.all([
+    redis.set("cache:github:repos", serialized, "EX", TTL_SEC).catch((err) =>
+      logger.warn({ err: err.message }, "github_cache_write_failed"),
+    ),
+    redis.set("stale:github", serialized, "EX", 86400).catch((err) =>
+      logger.warn({ err: err.message }, "github_stale_cache_write_failed"),
+    ),
+  ]);
+  return data;
+}
+
+async function coordinatedBuild() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const lockKey = "lock:github:repos";
+    const owner = randomUUID();
+    let acquired;
+    try {
+      acquired = await redis.set(lockKey, owner, "EX", LOCK_SEC, "NX");
+    } catch (err) {
+      logger.warn({ err: err.message }, "github_refresh_lock_failed");
+      return buildAndStore();
+    }
+
+    if (acquired !== "OK") {
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const cached = await redis.get("cache:github:repos");
+        if (cached) return JSON.parse(cached);
+      }
+      throw new Error("Another GitHub refresh is still in progress");
+    }
+
+    try {
+      return await buildAndStore();
+    } finally {
+      try {
+        await redis.eval(RELEASE_LOCK, 1, lockKey, owner);
+      } catch (err) {
+        logger.warn({ err: err.message }, "github_refresh_lock_release_failed");
+      }
+    }
+  })().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
 async function getGithubData() {
   try {
-    return await cache.getOrSet("github:repos", TTL_SEC, async () => {
-      const data = await build();
-      await redis
-        .set("stale:github", JSON.stringify(data), "EX", 86400)
-        .catch(() => {});
-      return data;
-    });
+    return await cache.getOrSet(
+      "github:repos",
+      TTL_SEC,
+      coordinatedBuild,
+    );
   } catch (err) {
     // Rate-limited or GitHub down: serve the last good copy (up to 24h) instead of breaking the page.
     logger.warn({ err: err.message }, "github_fetch_failed");

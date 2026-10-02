@@ -220,6 +220,8 @@ function PageRoutes() {
 
 function SiteLayout() {
   const location = useLocation();
+  const mainRef = useRef(null);
+  const previousPath = useRef(location.pathname);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -228,6 +230,10 @@ function SiteLayout() {
       ? "auto"
       : "smooth";
     window.scrollTo({ top: 0, behavior });
+    if (previousPath.current !== location.pathname) {
+      mainRef.current?.focus({ preventScroll: true });
+      previousPath.current = location.pathname;
+    }
     setMobileOpen(false);
     setPaletteOpen(false);
   }, [location.pathname]);
@@ -360,7 +366,12 @@ function SiteLayout() {
           </AnimatePresence>
         </header>
 
-        <main id="main" className="mx-auto min-h-[calc(100vh-10rem)] max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:py-16">
+        <main
+          ref={mainRef}
+          id="main"
+          tabIndex={-1}
+          className="mx-auto min-h-[calc(100vh-10rem)] max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:py-16"
+        >
           <PageRoutes />
         </main>
 

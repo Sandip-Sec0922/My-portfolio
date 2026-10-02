@@ -1,36 +1,48 @@
 "use strict";
 const { z } = require("zod");
-const { FilterXSS } = require("xss");
 const {
   PROJECT_CATEGORIES,
   POST_CATEGORIES,
   ALL_EVENT_TYPES,
 } = require("../utils/constants");
 
-// WHY strip at the trust boundary: plain-text fields never legitimately contain HTML. Removing it here
-// protects the admin inbox/email, logs and any future consumer. (React escaping protects the browser.)
-const htmlStripper = new FilterXSS({
-  whiteList: {},
-  stripIgnoreTag: true,
-  stripIgnoreTagBody: ["script", "style"],
-});
+// eslint-disable-next-line no-control-regex -- explicitly reject unsupported C0/DEL control bytes.
+const unsupportedControls = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 
 const text = ({ min = 1, max, multiline = false }) => {
-  let s = z.string().trim().max(max);
+  let s = z
+    .string()
+    .trim()
+    .min(min)
+    .max(max);
   // WHY: CR/LF in single-line fields is the classic email-header / log-injection vector.
   if (!multiline) s = s.regex(/^[^\r\n]*$/, "Must be a single line");
-  return s
-    .transform((v) => htmlStripper.process(v).trim())
-    .pipe(z.string().min(min));
+  return s.refine(
+    (value) => !unsupportedControls.test(value),
+    "Contains unsupported control characters",
+  );
 };
 
 const email = z.string().trim().toLowerCase().email().max(254);
-// eslint-disable-next-line security/detect-unsafe-regex -- hyphen-delimited segments are unambiguous (linear time)
 const slug = z
   .string()
   .min(1)
   .max(80)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Lowercase letters, numbers, hyphens");
+  .refine(
+    (value) =>
+      value
+        .split("-")
+        .every(
+          (segment) =>
+            segment.length > 0 &&
+            [...segment].every(
+              (character) =>
+                (character >= "a" && character <= "z") ||
+                (character >= "0" && character <= "9"),
+            ),
+        ),
+    "Lowercase letters, numbers, hyphens",
+  );
 const tag = z
   .string()
   .trim()
@@ -43,7 +55,10 @@ const httpsUrl = z
   .trim()
   .max(300)
   .url()
-  .refine((u) => u.startsWith("https://"), "Must be an https URL");
+  .refine((value) => {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  }, "Must be an https URL without embedded credentials");
 const githubUrl = httpsUrl.refine(
   (u) => new URL(u).hostname === "github.com",
   "Must be a github.com URL",
@@ -73,7 +88,7 @@ const contactSchema = z
     email,
     subject: text({ min: 3, max: 120 }),
     message: text({ min: 10, max: 2000, multiline: true }),
-    website: z.string().max(200).optional(), // honeypot: real users never see or fill this field
+    companyWebsite: z.string().max(200).optional(), // honeypot: real users never see or fill this field
     turnstileToken: z.string().max(2048).optional(),
   })
   .strict();

@@ -29,6 +29,7 @@ x-api-common: &api-common
   environment: &api-env
     NODE_ENV: production
     PORT: 5000
+    TRUST_PROXY_HOPS: 1
     MONGO_URI: ${MONGO_URI:-mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=${MONGO_DB}}
     REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET}
@@ -175,10 +176,17 @@ services:
       - no-new-privileges:true
     networks: [data]
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet
+          --username "$$MONGO_INITDB_ROOT_USERNAME"
+          --password "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin
+          --eval "db.adminCommand('ping').ok" | grep -q 1
       interval: 15s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 30s
 
 networks:

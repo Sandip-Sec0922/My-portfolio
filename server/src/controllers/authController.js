@@ -7,6 +7,7 @@ const { issueToken } = require("../middleware/csrf");
 const passwords = require("../services/passwordService");
 const tokens = require("../services/tokenService");
 const lockout = require("../services/lockoutService");
+const { dummyHash } = passwords;
 const { logSecurity } = require("../services/securityEventService");
 
 const publicUser = (u) => ({ email: u.email, role: u.role });
@@ -31,7 +32,7 @@ exports.login = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email }).select("+passwordHash");
   const valid = await passwords.verify(
-    user ? user.passwordHash : await passwords.dummyHash(),
+    user ? user.passwordHash : await dummyHash(),
     password,
   );
 
@@ -63,8 +64,9 @@ exports.refresh = asyncHandler(async (req, res) => {
     throw new AppError(401, "UNAUTHENTICATED", "Authentication required");
 
   let userId;
+  let authTime;
   try {
-    userId = await tokens.consumeRefresh(token);
+    ({ userId, authTime } = await tokens.consumeRefresh(token));
   } catch (err) {
     if (err.code === "REFRESH_REUSE")
       logSecurity("refresh_reuse_detected", req);
@@ -77,7 +79,7 @@ exports.refresh = asyncHandler(async (req, res) => {
     clearAuthCookies(res);
     throw new AppError(401, "UNAUTHENTICATED", "Authentication required");
   }
-  await tokens.issueSession(res, user);
+  await tokens.issueSession(res, user, authTime);
   res.json({ user: publicUser(user) });
 });
 
@@ -101,8 +103,14 @@ exports.logout = asyncHandler(async (req, res) => {
   res.status(204).end();
 });
 
-exports.me = (req, res) =>
-  res.json({ user: { id: req.user.id, role: req.user.role } });
+exports.me = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id).select("email role");
+  if (!user)
+    throw new AppError(401, "UNAUTHENTICATED", "Authentication required");
+  res.json({
+    user: { id: String(user._id), email: user.email, role: user.role },
+  });
+});
 
 exports.changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
@@ -120,6 +128,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
   // Password change kills every existing session, including this one.
   await tokens.revokeAllForUser(String(user._id));
   await tokens.blacklistAccess(req.user);
+  logSecurity("password_changed", req, { actorId: String(user._id) });
   clearAuthCookies(res);
   res.status(204).end();
 });

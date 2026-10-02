@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const mongoSanitize = require("express-mongo-sanitize");
 const hpp = require("hpp");
 const httpLogger = require("./middleware/httpLogger");
+const config = require("./config/env");
 const {
   helmetMw,
   permissionsPolicy,
@@ -26,9 +27,8 @@ const bodyParser = (req, res, next) =>
 function createApp() {
   const app = express();
   app.disable("x-powered-by");
-  // Exactly one proxy (Nginx) sits in front. Trusting more would let clients spoof X-Forwarded-For
-  // and dodge rate limits / pollute logs.
-  app.set("trust proxy", 1);
+  // Configure the trusted proxy hop count to match the deployed ingress chain.
+  app.set("trust proxy", config.trustProxyHops);
 
   app.use(httpLogger);
   app.use(helmetMw);
@@ -36,6 +36,7 @@ function createApp() {
   app.use(noStore);
 
   app.get("/api/health", health.live); // before limiter: health checks must never be throttled
+  app.get("/api/health/ready", health.ready);
 
   app.use(corsMw);
   app.use(globalLimiter); // before body parsing: reject floods cheaply

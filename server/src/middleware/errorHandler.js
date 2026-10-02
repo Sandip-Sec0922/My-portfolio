@@ -40,6 +40,7 @@ function errorHandler(err, req, res, next) {
       "unhandled_error",
     );
 
+  res.set("Cache-Control", "no-store");
   res.status(status).json({
     error: { code, message, ...(details && { details }), requestId: req.id },
     ...(!config.isProd && status >= 500 && { debug: err.stack }), // dev only, never in production

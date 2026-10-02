@@ -10,6 +10,7 @@ async function connectDB() {
     serverSelectionTimeoutMS: 5000,
     maxPoolSize: 10,
   });
+  await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
   logger.info("mongo_connected");
 }
 

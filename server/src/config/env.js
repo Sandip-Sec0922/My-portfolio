@@ -12,6 +12,7 @@ const schema = z
       .enum(["development", "test", "production"])
       .default("development"),
     PORT: z.coerce.number().int().default(5000),
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(1),
     INSTANCE_ID: z.string().default("local"),
     LOG_LEVEL: z.string().optional(),
     MONGO_URI: z.string().min(1),
@@ -20,6 +21,21 @@ const schema = z
     JWT_REFRESH_SECRET: z.string().min(32),
     CSRF_SECRET: z.string().min(32),
     CORS_ORIGINS: z.string().min(1),
+    PUBLIC_SITE_URL: z
+      .string()
+      .url()
+      .default("https://sandipkepchhaki.com.np")
+      .refine((value) => {
+        const url = new URL(value);
+        return (
+          url.protocol === "https:" &&
+          !url.username &&
+          !url.password &&
+          url.pathname === "/" &&
+          !url.search &&
+          !url.hash
+        );
+      }, "Must be an HTTPS site origin"),
     COOKIE_DOMAIN: z.string().optional(),
     GITHUB_USERNAME: z.string().default("Sandip-Sec0922"),
     GITHUB_TOKEN: z.string().optional(),
@@ -41,7 +57,24 @@ const schema = z
       message:
         "JWT_ACCESS_SECRET, JWT_REFRESH_SECRET and CSRF_SECRET must all be different",
     },
-  );
+  )
+  .superRefine((e, ctx) => {
+    const values = {
+      JWT_ACCESS_SECRET: e.JWT_ACCESS_SECRET,
+      JWT_REFRESH_SECRET: e.JWT_REFRESH_SECRET,
+      CSRF_SECRET: e.CSRF_SECRET,
+      ADMIN_BOOTSTRAP_PASSWORD: e.ADMIN_BOOTSTRAP_PASSWORD,
+    };
+    Object.entries(values).forEach(([key, value]) => {
+      if (value && /^change_me(?:_|$)/i.test(value)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: "Must be replaced with a unique secret",
+        });
+      }
+    });
+  });
 
 // WHY fail fast: a misconfigured security setting should stop boot, not silently weaken the app.
 // Only variable names and rules are printed, never values.
@@ -64,6 +97,7 @@ module.exports = Object.freeze({
   isProd,
   isTest: e.NODE_ENV === "test",
   port: e.PORT,
+  trustProxyHops: e.TRUST_PROXY_HOPS,
   instanceId: e.INSTANCE_ID,
   logLevel:
     e.LOG_LEVEL ||
@@ -81,6 +115,7 @@ module.exports = Object.freeze({
   corsOrigins: e.CORS_ORIGINS.split(",")
     .map((s) => s.trim())
     .filter(Boolean),
+  publicSiteUrl: new URL(e.PUBLIC_SITE_URL).origin,
   cookieDomain: e.COOKIE_DOMAIN,
   github: { username: e.GITHUB_USERNAME, token: e.GITHUB_TOKEN },
   turnstileSecret: e.TURNSTILE_SECRET,

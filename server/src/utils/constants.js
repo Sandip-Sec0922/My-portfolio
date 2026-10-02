@@ -15,6 +15,10 @@ const INTERNAL_EVENT_TYPES = [
   "refresh_reuse_detected",
   "login_success",
   "logout",
+  "admin_create",
+  "admin_update",
+  "admin_delete",
+  "password_changed",
 ];
 
 module.exports = {

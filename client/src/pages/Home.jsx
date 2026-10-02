@@ -77,12 +77,14 @@ export default function Home() {
             </div>
             <div className="min-h-64 px-5 py-6 sm:px-7 sm:py-8">
               <p className="font-mono text-xs text-teal-300">WORKING NOTES / 01</p>
-              <pre className="mt-5 whitespace-pre-wrap font-mono text-xs leading-7 text-slate-200 sm:text-sm" aria-label={profile.terminal.join(" ")}>
-                <span aria-hidden="true">
+              <pre
+                className="mt-5 whitespace-pre-wrap font-mono text-xs leading-7 text-slate-200 sm:text-sm"
+                aria-hidden="true"
+              >
                   <span className="text-teal-300">{typed}</span>
                   <span className="ml-0.5 animate-pulse text-teal-200">▌</span>
-                </span>
               </pre>
+              <p className="sr-only">{profile.terminal.join("\n")}</p>
               <div className="mt-7 flex items-center justify-between border-t border-white/10 pt-4 font-mono text-[10px] text-slate-500">
                 <span>LEARN · DETECT · DOCUMENT</span>
                 <span className="text-teal-300">SESSION ACTIVE</span>

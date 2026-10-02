@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: soc-portfolio-api
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    healthCheckPath: /api/health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: MONGO_URI
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: soc-portfolio-redis
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: CSRF_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PUBLIC_SITE_URL
+        value: https://sandipkepchhaki.com.np
+      - key: ADMIN_BOOTSTRAP_EMAIL
+        sync: false
+      - key: ADMIN_BOOTSTRAP_PASSWORD
+        sync: false
+      - key: GITHUB_USERNAME
+        value: Sandip-Sec0922
+      - key: TURNSTILE_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: NOTIFY_EMAIL
+        sync: false
+
+  - type: keyvalue
+    name: soc-portfolio-redis
+    region: oregon
+    plan: free
+    maxmemoryPolicy: noeviction
+    persistenceMode: off
+    ipAllowList: []

@@ -10,8 +10,9 @@ const posts = require("../controllers/postController");
 const contact = require("../controllers/contactController");
 const github = require("../controllers/githubController");
 const security = require("../controllers/securityController");
-const health = require("../controllers/healthController");
+const sitemap = require("../controllers/sitemapController");
 
+router.get("/sitemap.xml", sitemap.get);
 router.get("/projects", validate(s.projectsQuery, "query"), projects.list);
 router.get("/posts", validate(s.postsQuery, "query"), posts.list);
 router.get("/posts/:slug", validate(s.slugParam, "params"), posts.getBySlug);
@@ -24,6 +25,4 @@ router.post(
   validate(s.contactSchema),
   contact.create,
 );
-router.get("/health/ready", health.ready);
-
 module.exports = router;

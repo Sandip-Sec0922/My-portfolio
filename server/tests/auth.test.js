@@ -115,6 +115,25 @@ describe("login", () => {
     expect(access).toMatch(/HttpOnly/i);
     expect(access).toMatch(/SameSite=Strict/i);
     expect(refresh).toMatch(/Path=\/api\/auth/);
+    const me = await agent.get("/api/auth/me");
+    expect(me.status).toBe(200);
+    expect(me.body.user.email).toBe(EMAIL);
+  });
+
+  test("wrong current password does not invalidate an authenticated session", async () => {
+    const agent = request.agent(app);
+    const { token } = await csrf(agent);
+    await login(agent, token);
+
+    const result = await agent
+      .post("/api/auth/change-password")
+      .set("X-CSRF-Token", token)
+      .send({
+        currentPassword: "incorrect-current-password",
+        newPassword: "Different-Long-Password-42",
+      });
+    expect(result.status).toBe(401);
+    expect(result.body.error.code).toBe("INVALID_CREDENTIALS");
     expect((await agent.get("/api/auth/me")).status).toBe(200);
   });
 

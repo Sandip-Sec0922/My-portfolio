@@ -51,7 +51,12 @@ export async function request(path, opts = {}, tried = {}) {
     }
     const isAuthCall =
       path.startsWith("/auth/login") || path.startsWith("/auth/refresh");
-    if (e.status === 401 && !tried.refresh && !isAuthCall) {
+    if (
+      e.status === 401 &&
+      e.code === "UNAUTHENTICATED" &&
+      !tried.refresh &&
+      !isAuthCall
+    ) {
       try {
         await refresh();
       } catch {

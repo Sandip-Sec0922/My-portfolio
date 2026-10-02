@@ -36,7 +36,7 @@ jobs:
       matrix:
         include:
           - { name: api,   file: server/Dockerfile, context: server }
-          - { name: nginx, file: nginx/Dockerfile,  context: . }
+          - { name: nginx, file: Nginx/Dockerfile, context: . }
     steps:
       - uses: actions/checkout@v4
         with:

@@ -26,6 +26,20 @@ const clean = (d) =>
   );
 
 async function persist(type, ctx, details) {
+  const sanitizedDetails = clean(details);
+  if (type.startsWith("admin_") || type === "password_changed") {
+    await SecurityEvent.create({
+      type,
+      ip: ctx.ip,
+      method: ctx.method,
+      path: ctx.path,
+      userAgent: ctx.user_agent,
+      requestId: ctx.request_id,
+      details: sanitizedDetails,
+    });
+    return;
+  }
+
   // 1) Daily counters in Redis -> public "Security Posture" page (aggregates only, no IPs).
   const day = new Date().toISOString().slice(0, 10);
   const key = `sec:count:${type}:${day}`;
@@ -61,7 +75,7 @@ async function persist(type, ctx, details) {
       path: ctx.path,
       userAgent: ctx.user_agent,
       requestId: ctx.request_id,
-      details: clean(details),
+      details: sanitizedDetails,
     });
   }
 }

@@ -5,6 +5,7 @@ const logger = require("./utils/logger");
 const redis = require("./config/redis");
 const { connectDB } = require("./config/db");
 const bootstrapAdmin = require("./services/bootstrapAdmin");
+const passwords = require("./services/passwordService");
 const { createApp } = require("./app");
 
 const waitForRedis = (ms = 10000) =>
@@ -21,6 +22,7 @@ async function main() {
   await connectDB();
   await waitForRedis();
   await bootstrapAdmin();
+  await passwords.dummyHash();
 
   const server = createApp().listen(config.port, () =>
     logger.info({ port: config.port }, "api_listening"),

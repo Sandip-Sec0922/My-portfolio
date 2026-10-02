@@ -66,7 +66,8 @@ test.each([
 test("accepts one exact HTTPS frontend origin in production", () => {
   const result = loadEnv({
     NODE_ENV: "production",
-    CORS_ORIGINS: "https://portfolio.example",
+    CORS_ORIGINS:
+      "https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app",
   });
 
   expect(result.status).toBe(0);

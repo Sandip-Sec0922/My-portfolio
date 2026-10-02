@@ -45,7 +45,7 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
    - `MONGO_URI`: `<Atlas connection string for a least-privilege application user>`
    - `REDIS_URL`: `<Upstash Redis TLS URL, beginning rediss://>`
    - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CSRF_SECRET`: three distinct generated random strings, each at least 32 characters
-   - `CORS_ORIGINS` and `PUBLIC_SITE_URL` are set by the Blueprint to `https://my-portfolio-m3bc-i25ems9w5-sandip-80b8.vercel.app` for now. When you receive the custom domain, update both to that canonical HTTPS origin.
+   - `CORS_ORIGINS` and `PUBLIC_SITE_URL` are set by the Blueprint to `https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app` for now. When you receive the custom domain, update both to that canonical HTTPS origin.
    - Optional: `TURNSTILE_SECRET`; configure SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `NOTIFY_EMAIL`) for admin password recovery. `SMTP_PORT` defaults to `587`.
 3. Deploy the Blueprint and wait for the service health check to pass. Render supplies `PORT`; the API defaults to `10000` if run outside Render.
 4. Configure valid SMTP settings (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `NOTIFY_EMAIL`) in Render. SMTP is required for admin password-reset codes.

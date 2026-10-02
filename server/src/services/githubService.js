@@ -12,6 +12,7 @@ const LOCK_SEC = 30;
 const RELEASE_LOCK =
   "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
 let refreshPromise;
+let githubTokenRejected = false;
 
 async function gh(path) {
   const headers = {
@@ -21,11 +22,30 @@ async function gh(path) {
   };
   if (config.github.token)
     headers.Authorization = `Bearer ${config.github.token}`; // server-side only
-  const res = await fetch(`${API}${path}`, {
+  const url = `${API}${path}`;
+  const options = {
     headers,
     signal: AbortSignal.timeout(5000),
-  });
-  if (!res.ok) throw new Error(`GitHub responded ${res.status}`);
+  };
+  let res = await fetch(url, options);
+  if (res.status === 401 && config.github.token && !githubTokenRejected) {
+    githubTokenRejected = true;
+    logger.warn({ status: res.status }, "github_token_rejected");
+    const publicHeaders = { ...headers };
+    delete publicHeaders.Authorization;
+    res = await fetch(url, { ...options, headers: publicHeaders });
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const error = new Error(
+      `GitHub responded ${res.status}: ${String(body.message || "upstream request failed").slice(0, 200)}`,
+    );
+    error.status = res.status;
+    error.rateLimitRemaining = res.headers.get("x-ratelimit-remaining");
+    error.rateLimitReset = res.headers.get("x-ratelimit-reset");
+    error.retryAfter = res.headers.get("retry-after");
+    throw error;
+  }
   return res.json();
 }
 
@@ -37,15 +57,20 @@ async function build() {
   const repos = all.filter((r) => !r.fork && !r.archived);
 
   // Language byte counts for the 10 most recently pushed repos, aggregated.
-  const langs = await Promise.all(
-    repos
-      .slice(0, 10)
-      .map((r) =>
-        gh(`/repos/${user}/${encodeURIComponent(r.name)}/languages`).catch(
-          () => ({}),
+  const langs = [];
+  const languageRepos = repos.slice(0, 10);
+  for (let i = 0; i < languageRepos.length; i += 3) {
+    const batch = languageRepos.slice(i, i + 3);
+    langs.push(
+      ...(await Promise.all(
+        batch.map((r) =>
+          gh(`/repos/${user}/${encodeURIComponent(r.name)}/languages`).catch(
+            () => ({}),
+          ),
         ),
-      ),
-  );
+      )),
+    );
+  }
   const totals = {};
   langs.forEach((l) =>
     Object.entries(l).forEach(([k, v]) => {
@@ -137,7 +162,16 @@ async function getGithubData() {
     );
   } catch (err) {
     // Rate-limited or GitHub down: serve the last good copy (up to 24h) instead of breaking the page.
-    logger.warn({ err: err.message }, "github_fetch_failed");
+    logger.warn(
+      {
+        err: err.message,
+        upstreamStatus: err.status,
+        rateLimitRemaining: err.rateLimitRemaining,
+        rateLimitReset: err.rateLimitReset,
+        retryAfter: err.retryAfter,
+      },
+      "github_fetch_failed",
+    );
     const stale = await redis.get("stale:github").catch(() => null);
     if (stale) return { ...JSON.parse(stale), stale: true };
     throw new AppError(

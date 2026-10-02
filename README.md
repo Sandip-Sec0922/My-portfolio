@@ -45,7 +45,7 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
    - `MONGO_URI`: `<Atlas connection string for a least-privilege application user>`
    - `REDIS_URL`: `<Upstash Redis TLS URL, beginning rediss://>`
    - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CSRF_SECRET`: three distinct generated random strings, each at least 32 characters
-   - `CORS_ORIGINS` and `PUBLIC_SITE_URL` are set by the Blueprint to `https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app` for now. When you receive the custom domain, update both to that canonical HTTPS origin.
+   - `CORS_ORIGINS` is a comma-separated allowlist of exact HTTPS origins (host only, no path or trailing slash); the Blueprint includes the stable Vercel alias and the original deployment hostname. `PUBLIC_SITE_URL` is set to the stable Vercel alias. Update these when you attach a custom domain.
    - Optional: `TURNSTILE_SECRET`; when enabled, also set the matching public `VITE_TURNSTILE_SITE_KEY` in Vercel and redeploy the frontend. The public site key does not belong in Render.
    - Configure Resend (`RESEND_API_KEY`, `RESEND_FROM`) for admin password recovery. Resend requires a domain you own and have verified; use a sender address on that domain. Set `NOTIFY_EMAIL` to the inbox that should receive contact-form alerts. Contact messages are stored in MongoDB independently of email delivery. Render's free web services block SMTP ports 25, 465, and 587, so SMTP will not work there.
 3. Deploy the Blueprint and wait for the service health check to pass. Render supplies `PORT`; the API defaults to `10000` if run outside Render.
@@ -111,6 +111,7 @@ There is no public registration or first-run admin creation endpoint. Keep Resen
 2. `client/vercel.json` contains the install/build settings, SPA fallback, security headers, API rewrite, and dynamic sitemap rewrite.
 3. The API and sitemap rewrites target the live API at `https://my-portfolio-tlnr.onrender.com`.
 4. Set `VITE_TURNSTILE_SITE_KEY` in Vercel only if Turnstile is enabled; set the corresponding `TURNSTILE_SECRET` in Render. Configure both values or leave both unset. `VITE_*` values are public and must never contain secrets.
+5. The production `CORS_ORIGINS` value on Render must contain the exact Vercel site origins that serve the frontend (for example, `https://my-portfolio-m3bc-pink.vercel.app`), comma-separated without paths or trailing slashes. Save the Render environment change and redeploy the API.
 
 ### MongoDB Atlas
 

@@ -52,7 +52,14 @@ test.each([
   ["missing", ""],
   ["wildcard", "*"],
   ["localhost", "http://localhost:5173"],
-  ["multiple origins", "https://portfolio.example,https://preview.example"],
+  ["path", "https://portfolio.example/contact"],
+  ["trailing slash", "https://portfolio.example/"],
+  ["empty entry", "https://portfolio.example,"],
+  ["duplicate origins", "https://portfolio.example,https://portfolio.example"],
+  [
+    "too many origins",
+    Array.from({ length: 11 }, (_, index) => `https://site${index}.example`).join(","),
+  ],
 ])("refuses production CORS origin configuration: %s", (_name, origin) => {
   const result = loadEnv({
     NODE_ENV: "production",
@@ -63,11 +70,13 @@ test.each([
   expect(result.stderr).toContain("CORS_ORIGINS");
 });
 
-test("accepts one exact HTTPS frontend origin in production", () => {
+test("accepts an explicit list of exact HTTPS frontend origins in production", () => {
   const result = loadEnv({
     NODE_ENV: "production",
-    CORS_ORIGINS:
+    CORS_ORIGINS: [
+      "https://my-portfolio-m3bc-pink.vercel.app",
       "https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app",
+    ].join(","),
   });
 
   expect(result.status).toBe(0);

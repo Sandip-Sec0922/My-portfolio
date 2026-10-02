@@ -56,10 +56,10 @@ projects:
                 sync: false
               # Allowed browser frontend origin.
               - key: CORS_ORIGINS
-                value: https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app
+                value: https://my-portfolio-m3bc-pink.vercel.app,https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app
               # Canonical frontend URL used to generate the API sitemap.
               - key: PUBLIC_SITE_URL
-                value: https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app
+                value: https://my-portfolio-m3bc-pink.vercel.app
               # Required external Redis-compatible connection URL (for example, Upstash rediss:// URL).
               - key: REDIS_URL
                 sync: false

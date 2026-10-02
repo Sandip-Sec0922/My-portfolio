@@ -90,16 +90,15 @@ const schema = z
     const origins = e.CORS_ORIGINS.split(",").map((origin) => origin.trim());
     if (
       e.NODE_ENV === "production" &&
-      (origins.length !== 1 ||
-        !origins[0] ||
-        origins[0] === "*" ||
-        !isProductionOrigin(origins[0]))
+      (origins.length > 10 ||
+        new Set(origins).size !== origins.length ||
+        origins.some((origin) => !isProductionOrigin(origin)))
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["CORS_ORIGINS"],
         message:
-          "Production requires exactly one HTTPS frontend origin (no wildcard, localhost, path, or trailing slash)",
+          "Production requires up to 10 unique HTTPS frontend origins (no wildcard, localhost, path, or trailing slash)",
       });
     }
 

@@ -75,3 +75,16 @@ test("reads from the source of truth if cache version lookup fails", async () =>
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(mockRedis.set).not.toHaveBeenCalled();
 });
+
+test("shares the versioned key and explicit TTL across cache get/set", async () => {
+  const value = { repos: [] };
+  await cache.set("github:repos", value, 1200);
+
+  expect(mockRedis.set).toHaveBeenCalledWith(
+    "cache:github:v0:repos",
+    JSON.stringify(value),
+    "EX",
+    1200,
+  );
+  await expect(cache.get("github:repos")).resolves.toEqual(value);
+});

@@ -102,14 +102,9 @@ async function build() {
 
 async function buildAndStore() {
   const data = await build();
-  const serialized = JSON.stringify(data);
   await Promise.all([
-    redis.set("cache:github:repos", serialized, "EX", TTL_SEC).catch((err) =>
-      logger.warn({ err: err.message }, "github_cache_write_failed"),
-    ),
-    redis.set("stale:github", serialized, "EX", 86400).catch((err) =>
-      logger.warn({ err: err.message }, "github_stale_cache_write_failed"),
-    ),
+    cache.set("github:repos", data, TTL_SEC),
+    cache.set("github:stale:repos", data, 86400),
   ]);
   return data;
 }
@@ -130,8 +125,8 @@ async function coordinatedBuild() {
     if (acquired !== "OK") {
       for (let attempt = 0; attempt < 12; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 250));
-        const cached = await redis.get("cache:github:repos");
-        if (cached) return JSON.parse(cached);
+        const cached = await cache.get("github:repos");
+        if (cached !== null) return cached;
       }
       throw new Error("Another GitHub refresh is still in progress");
     }
@@ -170,8 +165,8 @@ async function getGithubData() {
       },
       "github_fetch_failed",
     );
-    const stale = await redis.get("stale:github").catch(() => null);
-    if (stale) return { ...JSON.parse(stale), stale: true };
+    const stale = await cache.get("github:stale:repos");
+    if (stale) return { ...stale, stale: true };
     throw new AppError(
       502,
       "UPSTREAM_ERROR",

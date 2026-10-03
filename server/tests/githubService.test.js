@@ -9,13 +9,15 @@ const mockRedis = {
     redisStore.set(key, value);
     return "OK";
   }),
+  incr: jest.fn(async (key) => {
+    const next = Number(redisStore.get(key) || 0) + 1;
+    redisStore.set(key, String(next));
+    return next;
+  }),
   eval: jest.fn(async () => 1),
 };
 
 jest.mock("../src/config/redis", () => mockRedis);
-jest.mock("../src/services/cacheService", () => ({
-  getOrSet: (_key, _ttl, fetcher) => fetcher(),
-}));
 jest.mock("../src/utils/logger", () => ({
   warn: jest.fn(),
   error: jest.fn(),
@@ -23,6 +25,7 @@ jest.mock("../src/utils/logger", () => ({
 
 const logger = require("../src/utils/logger");
 const config = require("../src/config/env");
+const cache = require("../src/services/cacheService");
 const { getGithubData } = require("../src/services/githubService");
 const originalToken = config.github.token;
 
@@ -69,12 +72,39 @@ test("tries the configured credential again after a later rotation", async () =>
 
   await expect(getGithubData()).resolves.toMatchObject({ repos: [] });
   config.github.token = "corrected-token";
+  await cache.invalidate("github:");
   await expect(getGithubData()).resolves.toMatchObject({ repos: [] });
 
   expect(global.fetch).toHaveBeenCalledTimes(3);
   expect(global.fetch.mock.calls[2][1].headers.Authorization).toBe(
     "Bearer corrected-token",
   );
+});
+
+test("coalesces concurrent refreshes and writes fresh and stale values through the shared cache", async () => {
+  global.fetch = jest.fn().mockResolvedValue(response(200, []));
+
+  const [first, second] = await Promise.all([
+    getGithubData(),
+    getGithubData(),
+  ]);
+
+  expect(first).toEqual(second);
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(redisStore.has("cache:github:v0:repos")).toBe(true);
+  expect(redisStore.has("cache:github:v0:stale:repos")).toBe(true);
+  expect(redisStore.has("cache:github:repos")).toBe(false);
+  expect(redisStore.has("stale:github")).toBe(false);
+});
+
+test("serves the versioned stale GitHub copy after an upstream failure", async () => {
+  const stale = { repos: [{ name: "cached" }], fetchedAt: "yesterday" };
+  await cache.set("github:stale:repos", stale, 86400);
+  global.fetch = jest.fn().mockResolvedValue(
+    response(403, { message: "API rate limit exceeded" }),
+  );
+
+  await expect(getGithubData()).resolves.toEqual({ ...stale, stale: true });
 });
 
 test("records GitHub rate-limit details when the upstream request is rejected", async () => {

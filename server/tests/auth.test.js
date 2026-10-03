@@ -245,9 +245,15 @@ describe("sessions", () => {
     const { token } = await csrf(agent);
     const res = await login(agent, token);
     const stolen = getCookie(res, "access_token").split(";")[0];
-    expect(
-      (await agent.post("/api/auth/logout").set("X-CSRF-Token", token)).status,
-    ).toBe(204);
+    expect(getCookie(res, "access_token")).toMatch(/Path=\/api(?:;|$)/);
+
+    const loggedOut = await agent
+      .post("/api/auth/logout")
+      .set("X-CSRF-Token", token);
+    expect(loggedOut.status).toBe(204);
+    const clearedAccess = getCookie(loggedOut, "access_token");
+    expect(clearedAccess).toMatch(/Path=\/api(?:;|$)/);
+    expect(clearedAccess).toMatch(/Expires=Thu, 01 Jan 1970/i);
     const replay = await request(app).get("/api/auth/me").set("Cookie", stolen);
     expect(replay.status).toBe(401);
   });
@@ -290,5 +296,26 @@ describe("sessions", () => {
     expect(
       (await agent.post("/api/auth/refresh").set("X-CSRF-Token", token)).status,
     ).toBe(401);
+  });
+
+  test("concurrent refresh attempts cannot both consume the same token", async () => {
+    const agent = request.agent(app);
+    const { token, cookie: csrfCookie } = await csrf(agent);
+    const res = await login(agent, token);
+    const oldRefresh = getCookie(res, "refresh_token").split(";")[0];
+
+    const attempts = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        request(app)
+          .post("/api/auth/refresh")
+          .set("Cookie", [oldRefresh, csrfCookie])
+          .set("X-CSRF-Token", token),
+      ),
+    );
+
+    expect(attempts.map(({ status }) => status).sort()).toEqual([200, 401]);
+    expect(attempts.find(({ status }) => status === 401).body.error.code).toBe(
+      "REFRESH_REUSE",
+    );
   });
 });

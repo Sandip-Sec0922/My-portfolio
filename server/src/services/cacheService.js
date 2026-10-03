@@ -9,33 +9,58 @@ const PREFIX = "cache:";
 // Redis: only successful, non-empty results are stored.
 const namespaceFor = (key) => key.split(":", 1)[0];
 
-async function getOrSet(key, ttlSec, fetcher, cacheIf = () => true) {
+async function versionedKey(key) {
   const namespace = namespaceFor(key);
-  let version = "0";
-  let versionAvailable = true;
   try {
-    version = (await redis.get(`${PREFIX}version:${namespace}`)) || "0";
+    const version = (await redis.get(`${PREFIX}version:${namespace}`)) || "0";
+    return `${PREFIX}${namespace}:v${version}:${key.slice(namespace.length + 1)}`;
   } catch (err) {
-    versionAvailable = false;
     logger.warn({ err: err.message }, "cache_version_read_failed");
+    return null;
   }
-  const k = `${PREFIX}${namespace}:v${version}:${key.slice(namespace.length + 1)}`;
-  if (versionAvailable) {
-    try {
-      const hit = await redis.get(k);
-      if (hit) return JSON.parse(hit);
-    } catch (err) {
-      logger.warn({ err: err.message }, "cache_read_failed");
-    }
+}
+
+async function get(key) {
+  const k = await versionedKey(key);
+  if (!k) return null;
+  return read(k);
+}
+
+async function read(k) {
+  try {
+    const hit = await redis.get(k);
+    return hit ? JSON.parse(hit) : null;
+  } catch (err) {
+    logger.warn({ err: err.message }, "cache_read_failed");
+    return null;
   }
+}
+
+async function write(k, value, ttlSec) {
+  try {
+    await redis.set(k, JSON.stringify(value), "EX", ttlSec);
+    return true;
+  } catch (err) {
+    logger.warn({ err: err.message }, "cache_write_failed");
+    return false;
+  }
+}
+
+async function set(key, value, ttlSec) {
+  const k = await versionedKey(key);
+  if (!k) return false;
+  return write(k, value, ttlSec);
+}
+
+async function getOrSet(key, ttlSec, fetcher, cacheIf = () => true) {
+  const k = await versionedKey(key);
+  if (k) {
+    const hit = await read(k);
+    if (hit !== null) return hit;
+  }
+
   const value = await fetcher();
-  if (versionAvailable && cacheIf(value)) {
-    try {
-      await redis.set(k, JSON.stringify(value), "EX", ttlSec);
-    } catch (err) {
-      logger.warn({ err: err.message }, "cache_write_failed");
-    }
-  }
+  if (k && cacheIf(value)) await write(k, value, ttlSec);
   return value;
 }
 
@@ -50,4 +75,4 @@ async function invalidate(prefix) {
   }
 }
 
-module.exports = { getOrSet, invalidate };
+module.exports = { get, set, getOrSet, invalidate };

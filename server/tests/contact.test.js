@@ -17,11 +17,19 @@ jest.mock("../src/services/mailService", () => ({
 
 const request = require("supertest");
 const Message = require("../src/models/Message");
+const mail = require("../src/services/mailService");
 const { createApp } = require("../src/app");
 
 const app = createApp();
 
 test("accepted contact requests are persisted as message documents", async () => {
+  const savedMessage = {
+    name: "Site visitor",
+    email: "visitor@example.com",
+    subject: "Project question",
+    message: "I would like to ask about your project.",
+  };
+  Message.create.mockResolvedValue(savedMessage);
   const agent = request.agent(app);
   const csrf = await agent.get("/api/auth/csrf");
 
@@ -45,4 +53,5 @@ test("accepted contact requests are persisted as message documents", async () =>
       message: "I would like to ask about your project.",
     }),
   );
+  expect(mail.notifyNewMessage).toHaveBeenCalledWith(savedMessage);
 });

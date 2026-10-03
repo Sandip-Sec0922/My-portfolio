@@ -46,8 +46,8 @@ The root Compose file models the local full stack and binds the Nginx HTTP port 
    - `REDIS_URL`: `<Upstash Redis TLS URL, beginning rediss://>`
    - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CSRF_SECRET`: three distinct generated random strings, each at least 32 characters
    - `CORS_ORIGINS` is a comma-separated allowlist of exact HTTPS origins (host only, no path or trailing slash); the Blueprint includes `https://www.sandipkepchhaki.com.np` and the existing Vercel aliases. `PUBLIC_SITE_URL` is set to the custom domain.
-   - Optional: `TURNSTILE_SECRET`; when enabled, also set the matching public `VITE_TURNSTILE_SITE_KEY` in Vercel and redeploy the frontend. The public site key does not belong in Render.
-   - Configure Resend (`RESEND_API_KEY`, `RESEND_FROM`) for admin password recovery. Resend requires a domain you own and have verified; use a sender address on that domain. Set `NOTIFY_EMAIL` to the inbox that should receive contact-form alerts. Contact messages are stored in MongoDB independently of email delivery. Render's free web services block SMTP ports 25, 465, and 587, so SMTP will not work there.
+   - Optional: `TURNSTILE_SECRET`; when enabled, also set the matching public `VITE_TURNSTILE_SITE_KEY` in Vercel and redeploy the frontend. The public site key does not belong in Render. In the Cloudflare Turnstile widget settings, allow `www.sandipkepchhaki.com.np` (and `sandipkepchhaki.com.np` if that hostname serves the site). Error `400020` indicates the widget rejected its current hostname/site-key configuration.
+   - Configure Resend (`RESEND_API_KEY`, `RESEND_FROM`) for admin password recovery and contact-form notifications. Resend requires a domain you own and have verified; use a sender address on that domain. Contact notifications default to `sarunmgr77@gmail.com`; override `NOTIFY_EMAIL` in Render to change the recipient. Contact messages are stored in MongoDB independently of email delivery. Render's free web services block SMTP ports 25, 465, and 587, so SMTP will not work there.
 3. Deploy the Blueprint and wait for the service health check to pass. Render supplies `PORT`; the API defaults to `10000` if run outside Render.
 4. Verify a domain you own in Resend, then configure `RESEND_API_KEY` and `RESEND_FROM` (for example, `Portfolio <no-reply@mail.yourdomain.com>`) in Render. Email is sent to the address on the admin account. The Resend API uses HTTPS; do not use Gmail SMTP on Render's free plan because outbound SMTP ports are blocked.
 5. Test the public service: `curl.exe -i https://<render-service-host>/api/health` should return HTTP 200 with `{"status":"ready","dependencies":{"mongo":true,"redis":true}}`. Copy the final `https://<render-service-host>` URL from the Render service's dashboard for the Vercel rewrite destination.
@@ -110,7 +110,7 @@ There is no public registration or first-run admin creation endpoint. Keep Resen
 1. Import the repository as a Vercel project and set **Root Directory** to `client`; use the Vite preset.
 2. `client/vercel.json` contains the install/build settings, SPA fallback, security headers, API rewrite, and dynamic sitemap rewrite.
 3. The API and sitemap rewrites target the live API at `https://my-portfolio-tlnr.onrender.com`; this remains the API destination and is separate from the public website domain.
-4. Set `VITE_TURNSTILE_SITE_KEY` in Vercel only if Turnstile is enabled; set the corresponding `TURNSTILE_SECRET` in Render. Configure both values or leave both unset. `VITE_*` values are public and must never contain secrets.
+4. Set `VITE_TURNSTILE_SITE_KEY` in Vercel only if Turnstile is enabled; set the matching `TURNSTILE_SECRET` in Render. Add the deployed hostname to that same widget's allowed hostnames in Cloudflare (for this site: `www.sandipkepchhaki.com.np`). Configure the frontend and backend values as a matching pair or leave both unset. `VITE_*` values are public and must never contain secrets.
 5. The production `CORS_ORIGINS` value on Render must contain the exact frontend origins that serve the site, including `https://www.sandipkepchhaki.com.np`, comma-separated without paths or trailing slashes. Save the Render environment change and redeploy the API.
 
 ### MongoDB Atlas
@@ -118,6 +118,7 @@ There is no public registration or first-run admin creation endpoint. Keep Resen
 - Use a dedicated database user with `readWrite` access only to the application database; do not use an Atlas administrator credential.
 - Atlas requires network access from Render. Prefer a private connection or static Render egress IP allowlisting when available. If a broad Atlas IP access list is necessary, understand the increased exposure and rely on TLS, a strong unique password, and the least-privilege database role.
 - URL-encode special characters in MongoDB credentials. Never commit the URI or print it in diagnostics.
+- The active production MongoDB URI has no database path, so MongoDB selects its default `test` database. Keep that URI unchanged to preserve the current admin account, content, and messages; changing its database name does not move existing data.
 - A live connection is not established by these files alone; confirm `/api/health` after configuring the service.
 
 ## Validation

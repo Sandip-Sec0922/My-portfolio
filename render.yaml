@@ -21,9 +21,9 @@ projects:
             plan: free
             # Environment variables whose values are supplied in Render.
             envVars:
-              # Destination for contact-form email notifications; optional with the message inbox.
+              # Destination for contact-form email notifications (overrideable in Render).
               - key: NOTIFY_EMAIL
-                sync: false
+                value: sarunmgr77@gmail.com
               # Resend API key; use HTTPS email delivery on the free Render plan.
               - key: RESEND_API_KEY
                 sync: false

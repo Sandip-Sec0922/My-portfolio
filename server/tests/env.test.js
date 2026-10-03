@@ -9,6 +9,7 @@ const validEnv = {
   JWT_REFRESH_SECRET: "refresh-secret-unique-01234567890123",
   CSRF_SECRET: "csrf-secret-unique-01234567890123456",
   CORS_ORIGINS: "http://localhost:5173",
+  NOTIFY_EMAIL: "",
 };
 
 function loadEnv(overrides = {}) {
@@ -16,7 +17,7 @@ function loadEnv(overrides = {}) {
   if (!Object.hasOwn(overrides, "PORT")) delete env.PORT;
   return spawnSync(
     process.execPath,
-    ["-e", "const e=require('./src/config/env'); console.log(JSON.stringify({port:e.port}))"],
+    ["-e", "const e=require('./src/config/env'); console.log(JSON.stringify({port:e.port,notifyEmail:e.smtp.notifyEmail}))"],
     {
       cwd: path.join(__dirname, ".."),
       env,
@@ -45,7 +46,17 @@ test("rejects shipped placeholder secrets without echoing their values", () => {
 test("accepts distinct configured secrets", () => {
   const result = loadEnv();
   expect(result.status).toBe(0);
-  expect(JSON.parse(result.stdout)).toEqual({ port: 10000 });
+  expect(JSON.parse(result.stdout)).toEqual({
+    port: 10000,
+    notifyEmail: "sarunmgr77@gmail.com",
+  });
+});
+
+test("allows the contact notification recipient to be overridden", () => {
+  const result = loadEnv({ NOTIFY_EMAIL: "contact@example.com" });
+
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout).notifyEmail).toBe("contact@example.com");
 });
 
 test.each([

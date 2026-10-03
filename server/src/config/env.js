@@ -62,7 +62,10 @@ const schema = z
     SMTP_PORT: z.coerce.number().int().default(587),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
-    NOTIFY_EMAIL: z.string().email().optional(),
+    NOTIFY_EMAIL: z
+      .string()
+      .email()
+      .default("sarunmgr77@gmail.com"),
     RESEND_API_KEY: z.string().optional(),
     RESEND_FROM: z.string().trim().min(3).max(320).optional(),
   })

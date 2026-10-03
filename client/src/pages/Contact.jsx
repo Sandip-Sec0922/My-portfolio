@@ -6,35 +6,98 @@ import { profile } from "../data/profile.js";
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 const empty = { name: "", email: "", subject: "", message: "" };
+let turnstileScriptPromise;
 
-function Turnstile({ onToken }) {
+function loadTurnstile() {
+  if (window.turnstile) return Promise.resolve(window.turnstile);
+  if (turnstileScriptPromise) return turnstileScriptPromise;
+
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src =
+      "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.onload = () => {
+      if (window.turnstile) resolve(window.turnstile);
+      else {
+        turnstileScriptPromise = null;
+        reject(new Error("Cloudflare verification did not initialize."));
+      }
+    };
+    script.onerror = () => {
+      turnstileScriptPromise = null;
+      script.remove();
+      reject(new Error("Could not load Cloudflare verification."));
+    };
+    document.head.appendChild(script);
+  });
+
+  return turnstileScriptPromise;
+}
+
+function Turnstile({ onToken, attempt, onRetry }) {
   const ref = useRef(null);
+  const [error, setError] = useState("");
+
   useEffect(() => {
     if (!SITE_KEY) return undefined;
-    let id;
+    let widgetId;
     let cancelled = false;
-    const mount = () => {
-      if (cancelled || !ref.current || !window.turnstile) return;
-      id = window.turnstile.render(ref.current, {
-        sitekey: SITE_KEY,
-        callback: onToken,
-        "expired-callback": () => onToken(""),
+    setError("");
+    onToken("");
+
+    loadTurnstile()
+      .then((turnstile) => {
+        if (cancelled || !ref.current) return;
+        widgetId = turnstile.render(ref.current, {
+          sitekey: SITE_KEY,
+          callback: onToken,
+          "expired-callback": () => {
+            onToken("");
+            setError("Verification expired. Please complete it again.");
+          },
+          "timeout-callback": () => {
+            onToken("");
+            setError("Verification timed out. Please complete it again.");
+          },
+          "error-callback": (code) => {
+            onToken("");
+            setError(
+              String(code) === "400020"
+                ? "Cloudflare rejected this site key for this hostname (400020). Check that Vercel's VITE_TURNSTILE_SITE_KEY and Render's TURNSTILE_SECRET belong to the same widget, and allow www.sandipkepchhaki.com.np in that widget's hostnames."
+                : `Cloudflare verification failed (${String(code)}). Check the widget's site key, allowed hostnames, and network access.`,
+            );
+            return true;
+          },
+        });
+      })
+      .catch((loadError) => {
+        if (!cancelled)
+          setError(
+            `${loadError.message} Check that your browser or network is not blocking Cloudflare challenges.`,
+          );
       });
-    };
-    if (window.turnstile) mount();
-    else {
-      const script = document.createElement("script");
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-      script.async = true;
-      script.onload = mount;
-      document.head.appendChild(script);
-    }
+
     return () => {
       cancelled = true;
-      if (id !== undefined) window.turnstile?.remove(id);
+      if (widgetId !== undefined) window.turnstile?.remove(widgetId);
     };
-  }, [onToken]);
-  return SITE_KEY ? <div ref={ref} aria-label="Human verification" /> : null;
+  }, [attempt, onToken]);
+
+  if (!SITE_KEY) return null;
+  return (
+    <div className="space-y-2">
+      <div ref={ref} aria-label="Human verification" />
+      {error && (
+        <div className="flex flex-wrap items-center gap-3" role="alert">
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <button type="button" className="btn btn-sm" onClick={onRetry}>
+            Retry verification
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Contact() {
@@ -70,6 +133,8 @@ export default function Contact() {
         message:
           error.status === 429
             ? "Too many messages. Please wait a while before trying again."
+            : error.code === "CAPTCHA_FAILED"
+              ? "Verification failed. Complete the security check and try again. If it keeps failing, the site owner should check the Turnstile widget configuration."
             : `${error.message}${fields ? ` (${fields})` : ""}`,
       });
     } finally {
@@ -153,7 +218,11 @@ export default function Contact() {
               <label htmlFor="company-website">Leave this field empty</label>
               <input id="company-website" name="companyWebsite" tabIndex={-1} autoComplete="off" value={companyWebsite} onChange={(event) => setCompanyWebsite(event.target.value)} />
             </div>
-            <Turnstile key={turnstileAttempt} onToken={onToken} />
+            <Turnstile
+              attempt={turnstileAttempt}
+              onToken={onToken}
+              onRetry={() => setTurnstileAttempt((attempt) => attempt + 1)}
+            />
             {status.state === "error" && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700 dark:text-red-300" role="alert">
                 {status.message}
@@ -161,7 +230,11 @@ export default function Contact() {
             )}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-white/10">
               <p className="text-xs text-slate-500">Protected by abuse prevention controls.</p>
-              <button className="btn btn-solid min-w-36" disabled={sending} aria-busy={sending}>
+              <button
+                className="btn btn-solid min-w-36"
+                disabled={sending || (Boolean(SITE_KEY) && !token)}
+                aria-busy={sending}
+              >
                 {sending ? (
                   <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" /> Sending…</>
                 ) : (

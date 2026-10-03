@@ -9,6 +9,82 @@ const url = (id) =>
   `https://attack.mitre.org/techniques/${id.replace(".", "/")}/`;
 const fmt = (date) => (date ? new Date(date).toISOString().slice(0, 10) : "");
 
+function LabTopology() {
+  return (
+    <section className="lab-topology" aria-labelledby="topology-title">
+      <div className="lab-topology-heading">
+        <div>
+          <p className="eyebrow">Environment map / planned</p>
+          <h2 id="topology-title" className="section-title mt-2">A contained detection loop</h2>
+        </div>
+        <span className="tag">Conceptual · not deployed</span>
+      </div>
+      <figure className="topology-scene">
+        <svg
+          className="topology-svg topology-isometric"
+          viewBox="0 0 900 430"
+          role="img"
+          aria-labelledby="topology-svg-title topology-svg-desc"
+        >
+          <title id="topology-svg-title">Planned home lab topology</title>
+          <desc id="topology-svg-desc">
+            Planned Kali attacker activity crosses a host-only lab network toward
+            Windows and Linux endpoints. Endpoint telemetry is intended for a Wazuh SIEM.
+          </desc>
+          <g className="topology-links">
+            <path d="M450 85V145M450 190L235 270M450 190L665 270M235 315L450 370M665 315L450 370" />
+          </g>
+          <g className="topology-node topology-node-attacker">
+            <circle cx="450" cy="55" r="28" />
+            <text x="450" y="60" textAnchor="middle">01</text>
+            <text className="topology-label" x="450" y="108" textAnchor="middle">Attacker · Kali</text>
+          </g>
+          <g className="topology-node topology-node-network">
+            <circle cx="450" cy="168" r="28" />
+            <text x="450" y="173" textAnchor="middle">02</text>
+            <text className="topology-label" x="450" y="220" textAnchor="middle">Host-only network</text>
+          </g>
+          <g className="topology-node">
+            <circle cx="235" cy="292" r="28" />
+            <text x="235" y="297" textAnchor="middle">03</text>
+            <text className="topology-label" x="235" y="345" textAnchor="middle">Windows + Sysmon</text>
+          </g>
+          <g className="topology-node">
+            <circle cx="665" cy="292" r="28" />
+            <text x="665" y="297" textAnchor="middle">04</text>
+            <text className="topology-label" x="665" y="345" textAnchor="middle">Linux + auth logs</text>
+          </g>
+          <g className="topology-node topology-node-siem">
+            <circle cx="450" cy="390" r="28" />
+            <text x="450" y="395" textAnchor="middle">05</text>
+            <text className="topology-label" x="450" y="425" textAnchor="middle">Wazuh SIEM</text>
+          </g>
+        </svg>
+        <p className="topology-mobile-summary">
+          Planned flow: attacker activity → isolated network → Windows and Linux
+          endpoints → Wazuh SIEM.
+        </p>
+        <figcaption className="topology-caption">
+          Isometric-style schematic, not a live 3D environment. The separation is a
+          design goal: attacker traffic stays within an isolated virtual network.
+          Components remain marked planned until built and verified.
+        </figcaption>
+      </figure>
+      <ul className="lab-component-list" aria-label="Lab component plan">
+        {lab.components.map((component) => (
+          <li key={component.name}>
+            <div>
+              <h3>{component.name}</h3>
+              <p>{component.detail}</p>
+            </div>
+            <StatusBadge status={component.status} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Reports() {
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page")) || 1;
@@ -98,7 +174,7 @@ export default function Lab() {
           <h1 id="lab" className="mt-3 text-4xl sm:text-5xl">Home lab & SOC workflow</h1>
           <p className="mt-3 max-w-3xl leading-relaxed">{lab.summary}</p>
         </div>
-        <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <div className="mb-8 grid gap-3 sm:grid-cols-3">
           {[
             ["Lab components", lab.components.length, "planned environment"],
             ["Detection ideas", detections.length, "mapped to ATT&CK"],
@@ -111,24 +187,7 @@ export default function Lab() {
             </div>
           ))}
         </div>
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {lab.components.map((component, index) => (
-              <motion.li
-                key={component.name}
-                className="glass h-full"
-                initial={{ opacity: 0, y: 8 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.24, delay: index * 0.04 }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-mono text-sm accent">{component.name}</h2>
-                  <StatusBadge status={component.status} />
-                </div>
-                <p className="prose-copy mt-3 text-sm">{component.detail}</p>
-              </motion.li>
-          ))}
-        </ul>
+        <LabTopology />
       </section>
 
       <section aria-labelledby="det">

@@ -1,4 +1,12 @@
 "use strict";
+jest.mock("../src/config/redis", () => {
+  const Redis = require("ioredis-mock");
+  return new Redis();
+});
+jest.mock("../src/models/SecurityEvent", () => ({
+  create: jest.fn().mockResolvedValue({}),
+}));
+
 const request = require("supertest");
 const { createApp } = require("../src/app");
 

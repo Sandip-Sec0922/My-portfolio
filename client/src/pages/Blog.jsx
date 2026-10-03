@@ -78,7 +78,7 @@ export function BlogList() {
           </div>
         )}
         {data && data.items.length > 0 && (
-          <motion.ul layout className="grid gap-4 lg:grid-cols-2">
+          <motion.ul layout className="writing-list">
             {data.items.map((post, index) => (
               <motion.li
                 key={post._id}
@@ -86,34 +86,37 @@ export function BlogList() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, delay: index * 0.035 }}
-                className="glass flex flex-col"
+                className="writing-row"
               >
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="writing-meta">
+                  <span className="writing-index">{String((data.page - 1) * 10 + index + 1).padStart(2, "0")}</span>
                   <span className="tag">{post.category}</span>
                   <time className="font-mono text-[10px] text-slate-500" dateTime={post.publishedAt}>
                     {fmt(post.publishedAt)}
                   </time>
                 </div>
-                <h2 className="mt-4 text-xl">
-                  <Link className="hover:text-teal-700 dark:hover:text-teal-200" to={`/blog/${post.slug}`}>
-                    {post.title}
-                  </Link>
-                </h2>
-                <p className="prose-copy mt-2 flex-1 text-sm">{post.excerpt}</p>
-                {post.tags.length > 0 && (
-                  <ul className="mt-4 flex flex-wrap gap-2" aria-label="Post tags">
-                    {post.tags.map((tag) => (
-                      <li key={tag}>
-                        <button className="tag transition hover:border-teal-600/50 hover:text-teal-700 dark:hover:text-teal-200" onClick={() => setFilter({ tag })}>
-                          #{tag}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <Link className="mt-5 inline-flex items-center gap-2 font-mono text-xs accent" to={`/blog/${post.slug}`}>
-                  Read write-up <span aria-hidden="true">→</span>
-                </Link>
+                <div className="writing-body">
+                  <h2>
+                    <Link to={`/blog/${post.slug}`}>{post.title}</Link>
+                  </h2>
+                  <p className="prose-copy mt-2 text-sm sm:text-base">{post.excerpt}</p>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+                    {post.tags.length > 0 ? (
+                      <ul className="flex flex-wrap gap-2" aria-label="Post tags">
+                        {post.tags.map((tag) => (
+                          <li key={tag}>
+                            <button className="tag transition hover:border-teal-600/50 hover:text-teal-700 dark:hover:text-teal-200" onClick={() => setFilter({ tag })}>
+                              #{tag}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <span />}
+                    <Link className="project-link" to={`/blog/${post.slug}`}>
+                      Read write-up <span aria-hidden="true">→</span>
+                    </Link>
+                  </div>
+                </div>
               </motion.li>
             ))}
           </motion.ul>
@@ -158,21 +161,24 @@ export function BlogPost() {
         <Link className="btn btn-solid mt-5" to="/blog">Back to write-ups</Link>
       </div>
     );
+  const wordCount = data.content.trim().split(/\s+/).filter(Boolean).length;
+  const readingMinutes = Math.max(1, Math.ceil(wordCount / 200));
   return (
-    <article className="mx-auto max-w-3xl">
+    <article className="writing-article">
       <Link className="inline-flex items-center gap-2 font-mono text-xs accent hover:underline" to="/blog">
         <span aria-hidden="true">←</span> All write-ups
       </Link>
-      <header className="mb-8 mt-6 border-b border-slate-200 pb-7 dark:border-white/10">
+      <header className="writing-article-header">
         <p className="eyebrow">{data.category}</p>
-        <h1 className="mt-3 text-3xl leading-tight sm:text-4xl">{data.title}</h1>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <time className="font-mono text-xs text-slate-500" dateTime={data.publishedAt}>{fmt(data.publishedAt)}</time>
+        <h1 className="writing-article-title">{data.title}</h1>
+        <div className="writing-byline">
+          <time dateTime={data.publishedAt}>{fmt(data.publishedAt)}</time>
+          <span>{readingMinutes} min read</span>
           {data.tags.map((tag) => <span key={tag} className="tag">#{tag}</span>)}
         </div>
-        {data.excerpt && <p className="prose-copy mt-5 text-base">{data.excerpt}</p>}
+        {data.excerpt && <p className="writing-deck">{data.excerpt}</p>}
       </header>
-      <div className="glass !p-5 sm:!p-8">
+      <div className="writing-content">
         <Markdown>{data.content}</Markdown>
       </div>
       <div className="mt-8 border-t border-slate-200 pt-5 dark:border-white/10">

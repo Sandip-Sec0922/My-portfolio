@@ -1,5 +1,13 @@
-import { useEffect, useState } from "react";
-import { Link, Navigate, NavLink, Outlet, Route, Routes } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import {
+  Link,
+  Navigate,
+  NavLink,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth.jsx";
 import { api } from "../api/client.js";
 import { errText, Field } from "./ui.jsx";
@@ -228,41 +236,89 @@ function ResetPassword() {
   );
 }
 
-const NAV = [
-  ["projects", "Projects"],
-  ["posts", "Posts"],
-  ["messages", "Messages"],
-  ["security", "Security log"],
-  ["account", "Account"],
+const NAV_GROUPS = [
+  {
+    label: "Content",
+    links: [["projects", "Projects"], ["posts", "Posts"]],
+  },
+  {
+    label: "Communication",
+    links: [["messages", "Messages"]],
+  },
+  {
+    label: "Security",
+    links: [["security", "Security log"]],
+  },
+  {
+    label: "System",
+    links: [["account", "Account"]],
+  },
 ];
 
 function Guard() {
   const { status, logout } = useAuth();
-  if (status === "loading") return <p>Checking session…</p>;
+  const location = useLocation();
+  const pageContentRef = useRef(null);
+  const previousPath = useRef(location.pathname);
+  useEffect(() => {
+    if (previousPath.current !== location.pathname) {
+      pageContentRef.current?.focus({ preventScroll: true });
+      previousPath.current = location.pathname;
+    }
+  }, [location.pathname]);
+  if (status === "loading") return <p role="status">Checking session…</p>;
   if (status === "out") return <Navigate to="/admin/login" replace />;
+  const current = NAV_GROUPS.flatMap(({ label, links }) =>
+    links.map(([to, name]) => ({ section: label, name, path: `/admin/${to}` })),
+  ).find(({ path }) => path === location.pathname);
   return (
-    <div className="space-y-6">
-      <nav
-        aria-label="Admin"
-        className="glass flex flex-wrap items-center gap-x-4 gap-y-2 !p-3 text-sm"
-      >
-        <span className="font-mono accent">admin</span>
-        {NAV.map(([to, label]) => (
-          <NavLink
-            key={to}
-            to={`/admin/${to}`}
-            className={({ isActive }) =>
-              `hover:underline ${isActive ? "font-semibold accent" : ""}`
-            }
-          >
-            {label}
-          </NavLink>
-        ))}
-        <button className="btn btn-sm ml-auto" onClick={logout}>
-          Sign out
-        </button>
-      </nav>
-      <Outlet />
+    <div className="admin-console">
+      <aside className="admin-sidebar">
+        <Link to="/admin/projects" className="admin-wordmark">
+          <span className="admin-mark" aria-hidden="true">SK</span>
+          <span><strong>Sandip</strong><small>SECURITY CONSOLE</small></span>
+        </Link>
+        <nav aria-label="Admin" className="admin-navigation">
+          {NAV_GROUPS.map(({ label, links }) => (
+            <div className="admin-nav-group" key={label}>
+              <p>{label}</p>
+              {links.map(([to, name]) => (
+                <NavLink
+                  key={to}
+                  to={`/admin/${to}`}
+                  className={({ isActive }) => `admin-nav-link${isActive ? " is-active" : ""}`}
+                >
+                  <span className="admin-nav-indicator" aria-hidden="true" />
+                  {name}
+                </NavLink>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="admin-sidebar-footer">
+          <span><i aria-hidden="true" />Authenticated session</span>
+          <button className="admin-signout" onClick={logout}>
+            Sign out <span aria-hidden="true">↗</span>
+          </button>
+        </div>
+      </aside>
+      <div className="admin-workspace">
+        <header className="admin-topbar">
+          <div>
+            <p>{current?.section || "Workspace"} <span aria-hidden="true">/</span> {current?.name || "Admin"}</p>
+            <span>Private administration area</span>
+          </div>
+          <span className="admin-topbar-state"><i aria-hidden="true" />Signed in</span>
+        </header>
+        <div
+          ref={pageContentRef}
+          id="admin-page-content"
+          tabIndex={-1}
+          className="admin-page-content"
+        >
+          <Outlet />
+        </div>
+      </div>
     </div>
   );
 }
@@ -279,7 +335,7 @@ export default function AdminApp() {
 
   return (
     <AuthProvider>
-      <div className="min-h-screen">
+      <div className="admin-root min-h-screen">
         <a
           href="#admin-main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-white focus:px-4 focus:py-3 focus:text-slate-950"

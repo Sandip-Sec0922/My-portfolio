@@ -5,15 +5,9 @@ export const profile = {
   github: "https://github.com/Sandip-Sec0922",
   linkedin: "https://www.linkedin.com/in/sandip-kepchhaki-9008a1242/",
   email: "sarunmgr77@gmail.com",
-  terminal: [
-    "$ whoami",
-    "sandip: aspiring SOC analyst (L1)",
-    "$ cat focus.txt",
-    "detect. investigate. build secure systems.",
-  ],
   about: [
     "I am working towards a SOC Analyst (L1) role. I started with Cisco's Introduction to Cybersecurity and a Security Operations Center course, then built a threat-intelligence tool to practise the daily SOC loop: collect, triage, enrich, alert.",
-    "This website is a project too. It runs behind a hardened Nginx reverse proxy and load balancer, with rate limiting, token rotation and security logging that you can inspect on the Security page.",
+    "This website is a project too. Its codebase combines a React application, an Express API, MongoDB, and Redis. The Security page documents controls implemented in the code; the hosting and network setup shown in local reference configuration should not be mistaken for verified production infrastructure.",
   ],
 };
 

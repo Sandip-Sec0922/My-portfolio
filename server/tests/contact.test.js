@@ -55,3 +55,33 @@ test("accepted contact requests are persisted as message documents", async () =>
   );
   expect(mail.notifyNewMessage).toHaveBeenCalledWith(savedMessage);
 });
+
+test("email notification failure does not discard a persisted contact request", async () => {
+  const order = [];
+  const savedMessage = {
+    name: "Site visitor",
+    email: "visitor@example.com",
+    subject: "Project question",
+    message: "I would like to ask about your project.",
+  };
+  Message.create.mockImplementationOnce(async () => {
+    order.push("persisted");
+    return savedMessage;
+  });
+  mail.notifyNewMessage.mockImplementationOnce(async () => {
+    order.push("notification attempted");
+    throw new Error("Resend unavailable");
+  });
+
+  const agent = request.agent(app);
+  const csrf = await agent.get("/api/auth/csrf");
+  const response = await agent
+    .post("/api/contact")
+    .set("X-CSRF-Token", csrf.body.csrfToken)
+    .send(savedMessage);
+
+  expect(response.status).toBe(201);
+  expect(response.body).toEqual({ ok: true });
+  expect(order).toEqual(["persisted", "notification attempted"]);
+  expect(mail.notifyNewMessage).toHaveBeenCalledWith(savedMessage);
+});

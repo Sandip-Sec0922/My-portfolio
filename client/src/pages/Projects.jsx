@@ -13,53 +13,48 @@ const CATS = [
   "other",
 ];
 
-function ProjectCard({ p }) {
+function ProjectCard({ p, index }) {
   return (
     <motion.li
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
-      whileHover={{ y: -4 }}
+      whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
-      className="glass flex min-h-full flex-col"
+      className="project-story"
     >
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-lg">{p.title}</h3>
-        {p.featured && (
-          <span className="tag !border-teal-700/20 !text-teal-800 dark:!text-teal-200">
-            Featured
-          </span>
-        )}
+      <div className="project-index" aria-hidden="true">
+        <span>{String(index + 1).padStart(2, "0")}</span>
+        <span className="project-index-line" />
+        <span className="font-mono text-[10px] uppercase tracking-widest">{p.category}</span>
       </div>
-      <p className="prose-copy mt-2 text-sm">{p.summary}</p>
-      <p className="prose-copy mt-4 whitespace-pre-line text-sm">{p.description}</p>
-      <ul className="mt-4 flex flex-wrap gap-2" aria-label="Technologies">
-        {p.tech.map((tech) => <li key={tech} className="tag">{tech}</li>)}
-      </ul>
-      {p.securityHighlights.length > 0 && (
-        <div className="mt-5 border-t border-slate-200 pt-4 dark:border-white/10">
-          <h4 className="font-mono text-[11px] uppercase tracking-wider accent">Security highlights</h4>
-          <ul className="mt-2 space-y-1 text-sm text-slate-600 dark:text-slate-300">
-            {p.securityHighlights.map((highlight) => (
-              <li key={highlight} className="flex gap-2">
-                <span className="accent" aria-hidden="true">↳</span>{highlight}
-              </li>
-            ))}
-          </ul>
+      <div className="project-story-body">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="project-title">{p.title}</h2>
+          {p.featured && <span className="tag shrink-0">Featured</span>}
         </div>
-      )}
-      <div className="mt-auto flex flex-wrap gap-2 pt-5">
-        {p.githubUrl && (
-          <a className="btn btn-sm" href={p.githubUrl} rel="noopener noreferrer">
-            Source code ↗
-          </a>
+        <p className="project-summary">{p.summary}</p>
+        <p className="prose-copy mt-4 whitespace-pre-line text-sm">{p.description}</p>
+        {p.securityHighlights?.length > 0 && (
+          <div className="project-highlights">
+            <h3 className="font-mono text-[11px] uppercase tracking-wider accent">Security notes</h3>
+            <ul className="mt-2 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+              {p.securityHighlights.map((highlight) => (
+                <li key={highlight}><span aria-hidden="true">↳ </span>{highlight}</li>
+              ))}
+            </ul>
+          </div>
         )}
-        {p.liveUrl && (
-          <a className="btn btn-sm" href={p.liveUrl} rel="noopener noreferrer">
-            Live demo ↗
-          </a>
-        )}
+        <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
+          <ul className="flex flex-wrap gap-2" aria-label="Technologies">
+            {(p.tech || []).map((tech) => <li key={tech} className="tag">{tech}</li>)}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            {p.githubUrl && <a className="project-link" href={p.githubUrl} rel="noopener noreferrer">Source code <span aria-hidden="true">↗</span></a>}
+            {p.liveUrl && <a className="project-link" href={p.liveUrl} rel="noopener noreferrer">Live demo <span aria-hidden="true">↗</span></a>}
+          </div>
+        </div>
       </div>
     </motion.li>
   );
@@ -80,16 +75,17 @@ function GithubPanel() {
           <li key={language.name} className="tag">{language.name} {language.percent}%</li>
         ))}
       </ul>
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {data.repos.slice(0, 8).map((repo) => (
-          <motion.li key={repo.name} className="glass !p-4" whileHover={{ y: -2 }}>
-            <a className="font-mono text-sm accent hover:underline" href={repo.url} rel="noopener noreferrer">
-              {repo.name} ↗
-            </a>
-            <p className="prose-copy mt-2 text-sm">{repo.description || "No description"}</p>
-            <p className="mt-3 font-mono text-[10px] text-slate-500 dark:text-slate-400">
-              {repo.language || "—"} · ★ {repo.stars} · forks {repo.forks}
-            </p>
+      <ul className="repository-list">
+        {data.repos.slice(0, 8).map((repo, index) => (
+          <motion.li key={repo.name} className="repository-row" whileHover={{ x: 3 }}>
+            <span className="repository-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+            <div className="min-w-0 flex-1">
+              <a className="font-medium accent hover:underline" href={repo.url} rel="noopener noreferrer">
+                {repo.name} <span aria-hidden="true">↗</span>
+              </a>
+              <p className="prose-copy mt-1 text-sm">{repo.description || "Repository description not provided."}</p>
+            </div>
+            <p className="repository-meta">{repo.language || "Language not specified"}<span>★ {repo.stars}</span></p>
           </motion.li>
         ))}
       </ul>
@@ -107,14 +103,15 @@ export default function Projects() {
     cat === "all" ? "/projects" : `/projects?category=${cat}`,
   );
   return (
-    <div className="space-y-16">
+    <div className="projects-page space-y-20">
       <section aria-labelledby="proj">
         <div className="page-intro">
           <p className="eyebrow">Selected work / 01</p>
-          <h1 id="proj" className="mt-3 text-4xl sm:text-5xl">Projects & experiments</h1>
-          <p className="mt-3 max-w-2xl leading-relaxed">
-            Practical builds around threat intelligence, security automation,
-            and secure-by-design web systems.
+          <h1 id="proj" className="projects-title">Projects &amp; experiments</h1>
+          <p className="projects-lede">
+            Builds at the intersection of security operations, threat intelligence,
+            and software engineering. Each entry is drawn from project data — no
+            invented results or screenshots.
           </p>
         </div>
         <div role="group" aria-label="Filter by category" className="mb-6 flex flex-wrap gap-2">
@@ -135,25 +132,25 @@ export default function Projects() {
           data.items.length === 0 ? (
             <p className="glass prose-copy">No projects in this category yet.</p>
           ) : (
-            <motion.ul layout className="grid gap-4 md:grid-cols-2">
+            <motion.ul layout className="project-list">
               <AnimatePresence mode="popLayout">
-                {data.items.map((project) => <ProjectCard key={project._id} p={project} />)}
+                {data.items.map((project, index) => <ProjectCard key={project._id} p={project} index={index} />)}
               </AnimatePresence>
             </motion.ul>
           )
         )}
       </section>
-      <section aria-labelledby="gh">
+      <section aria-labelledby="gh" className="github-section">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="eyebrow">Open source activity</p>
-            <h2 id="gh" className="section-title mt-2">From GitHub</h2>
+            <p className="eyebrow">Repository index / 02</p>
+            <h2 id="gh" className="section-title mt-2">Open source, live from GitHub</h2>
           </div>
           <a className="btn btn-sm" href="https://github.com/Sandip-Sec0922" rel="noopener noreferrer">
             View profile ↗
           </a>
         </div>
-        <div className="glass"><GithubPanel /></div>
+        <GithubPanel />
       </section>
     </div>
   );

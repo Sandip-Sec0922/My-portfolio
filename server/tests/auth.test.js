@@ -6,6 +6,19 @@ jest.mock("../src/config/redis", () => {
 jest.mock("../src/models/SecurityEvent", () => ({
   create: jest.fn().mockResolvedValue({}),
 }));
+jest.mock("../src/models/Project", () => ({
+  find: jest.fn(),
+  create: jest.fn(),
+  findByIdAndUpdate: jest.fn(),
+  findByIdAndDelete: jest.fn(),
+}));
+jest.mock("../src/models/Post", () => ({
+  find: jest.fn(),
+  findById: jest.fn(),
+  findByIdAndDelete: jest.fn(),
+  create: jest.fn(),
+  countDocuments: jest.fn(),
+}));
 jest.mock("../src/models/User", () => {
   const store = { user: null };
   const query = (value) => {
@@ -38,6 +51,8 @@ jest.mock("../src/services/mailService", () => ({
 const request = require("supertest");
 const redis = require("../src/config/redis");
 const User = require("../src/models/User");
+const Project = require("../src/models/Project");
+const Post = require("../src/models/Post");
 const passwords = require("../src/services/passwordService");
 const mail = require("../src/services/mailService");
 const { createApp } = require("../src/app");
@@ -63,6 +78,7 @@ beforeEach(async () => {
   realUser.passwordHash = await passwords.hash(PASSWORD);
   realUser.authVersion = 0;
   jest.restoreAllMocks();
+  jest.clearAllMocks();
   await redis.flushall();
 });
 
@@ -80,6 +96,13 @@ const login = (agent, token, password = PASSWORD, email = EMAIL) =>
     .post("/api/auth/login")
     .set("X-CSRF-Token", token)
     .send({ email, password });
+async function authenticatedAdmin() {
+  const agent = request.agent(app);
+  const { token } = await csrf(agent);
+  const response = await login(agent, token);
+  expect(response.status).toBe(200);
+  return { agent, token };
+}
 
 describe("CSRF", () => {
   test("state-changing request without token is rejected", async () => {
@@ -236,8 +259,17 @@ describe("sessions", () => {
     expect((await request(app).get("/api/auth/me")).status).toBe(401);
   });
 
-  test("admin API is denied without a token", async () => {
-    expect((await request(app).get("/api/admin/messages")).status).toBe(401);
+  test("admin content API is denied without a token", async () => {
+    expect((await request(app).get("/api/admin/projects")).status).toBe(401);
+    expect((await request(app).get("/api/admin/posts")).status).toBe(401);
+    expect(
+      (await request(app).post("/api/admin/projects").send({})).status,
+    ).toBe(401);
+    expect(
+      (await request(app).post("/api/admin/posts").send({})).status,
+    ).toBe(401);
+    expect(Project.create).not.toHaveBeenCalled();
+    expect(Post.create).not.toHaveBeenCalled();
   });
 
   test("logout blacklists the access token (replay fails)", async () => {
@@ -317,5 +349,102 @@ describe("sessions", () => {
     expect(attempts.find(({ status }) => status === 401).body.error.code).toBe(
       "REFRESH_REUSE",
     );
+  });
+});
+
+describe("admin content management", () => {
+  const projectInput = {
+    title: "Defensive Lab",
+    slug: "defensive-lab",
+    summary: "A defensive security project.",
+    description: "A project used to validate the authenticated project flow.",
+    category: "automation",
+    tech: ["Node.js"],
+    securityHighlights: [],
+    featured: false,
+    order: 1,
+  };
+  const postInput = {
+    title: "Triage notes",
+    slug: "triage-notes",
+    excerpt: "Notes from an investigation.",
+    content: "Review the authentication timeline.",
+    category: "incident-report",
+    tags: ["auth"],
+    published: true,
+  };
+
+  test("project create, update, and delete invalidate cached public lists", async () => {
+    const { agent, token } = await authenticatedAdmin();
+    const created = { _id: "665f1f77bcf86cd799439012", ...projectInput };
+    const updated = { ...created, title: "Defensive Lab Updated" };
+    Project.create.mockResolvedValue(created);
+    Project.findByIdAndUpdate.mockResolvedValue(updated);
+    Project.findByIdAndDelete.mockResolvedValue(updated);
+
+    const createResponse = await agent
+      .post("/api/admin/projects")
+      .set("X-CSRF-Token", token)
+      .send(projectInput);
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body).toMatchObject(projectInput);
+    expect(await redis.get("cache:version:projects")).toBe("1");
+
+    const updateResponse = await agent
+      .put(`/api/admin/projects/${created._id}`)
+      .set("X-CSRF-Token", token)
+      .send({ title: updated.title });
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.title).toBe(updated.title);
+    expect(Project.findByIdAndUpdate).toHaveBeenCalledWith(
+      created._id,
+      { $set: { title: updated.title } },
+      { new: true, runValidators: true },
+    );
+    expect(await redis.get("cache:version:projects")).toBe("2");
+
+    const deleteResponse = await agent
+      .delete(`/api/admin/projects/${created._id}`)
+      .set("X-CSRF-Token", token);
+    expect(deleteResponse.status).toBe(204);
+    expect(await redis.get("cache:version:projects")).toBe("3");
+  });
+
+  test("post create, update, and delete invalidate cached content", async () => {
+    const { agent, token } = await authenticatedAdmin();
+    const created = {
+      _id: "665f1f77bcf86cd799439013",
+      ...postInput,
+      publishedAt: null,
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    Post.create.mockResolvedValue(created);
+    Post.findById.mockResolvedValue(created);
+    Post.findByIdAndDelete.mockResolvedValue(created);
+
+    const createResponse = await agent
+      .post("/api/admin/posts")
+      .set("X-CSRF-Token", token)
+      .send({ ...postInput, published: false });
+    expect(createResponse.status).toBe(201);
+    expect(Post.create).toHaveBeenCalledWith(
+      expect.objectContaining({ ...postInput, published: false, publishedAt: null }),
+    );
+    expect(await redis.get("cache:version:posts")).toBe("1");
+
+    const updateResponse = await agent
+      .put(`/api/admin/posts/${created._id}`)
+      .set("X-CSRF-Token", token)
+      .send({ published: true });
+    expect(updateResponse.status).toBe(200);
+    expect(created.save).toHaveBeenCalledTimes(1);
+    expect(created.publishedAt).toBeInstanceOf(Date);
+    expect(await redis.get("cache:version:posts")).toBe("2");
+
+    const deleteResponse = await agent
+      .delete(`/api/admin/posts/${created._id}`)
+      .set("X-CSRF-Token", token);
+    expect(deleteResponse.status).toBe(204);
+    expect(await redis.get("cache:version:posts")).toBe("3");
   });
 });

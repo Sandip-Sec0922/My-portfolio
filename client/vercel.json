@@ -9,6 +9,38 @@
       "destination": "https://my-portfolio-tlnr.onrender.com/api/sitemap.xml"
     },
     {
+      "source": "/projects",
+      "destination": "/projects/index.html"
+    },
+    {
+      "source": "/lab",
+      "destination": "/lab/index.html"
+    },
+    {
+      "source": "/roadmap",
+      "destination": "/roadmap/index.html"
+    },
+    {
+      "source": "/blog",
+      "destination": "/blog/index.html"
+    },
+    {
+      "source": "/security",
+      "destination": "/security/index.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/contact/index.html"
+    },
+    {
+      "source": "/admin/login",
+      "destination": "/admin/login/index.html"
+    },
+    {
+      "source": "/admin/reset-password",
+      "destination": "/admin/reset-password/index.html"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://my-portfolio-tlnr.onrender.com/api/:path*"
     },

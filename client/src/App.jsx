@@ -24,6 +24,12 @@ const links = [
   ["/security", "Security"],
   ["/contact", "Contact"],
 ];
+const primaryLinks = [
+  ["/projects", "Work"],
+  ["/lab", "Lab"],
+  ["/blog", "Writing"],
+  ["/#about", "About"],
+];
 const AdminApp = lazy(() => import("./admin/AdminApp.jsx"));
 const Projects = lazy(() => import("./pages/Projects.jsx"));
 const Lab = lazy(() => import("./pages/Lab.jsx"));
@@ -153,7 +159,7 @@ function CommandPalette({ open, onClose }) {
                   type="button"
                   className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm hover:bg-slate-100 focus:bg-slate-100 dark:hover:bg-white/10 dark:focus:bg-white/10"
                   onClick={() => {
-                    onClose();
+                    onClose(false);
                     navigate(to);
                   }}
                 >
@@ -226,15 +232,32 @@ function PageRoutes() {
 function SiteLayout() {
   const location = useLocation();
   const mainRef = useRef(null);
+  const mobileNavButtonRef = useRef(null);
+  const paletteReturnFocusRef = useRef(null);
   const previousPath = useRef(location.pathname);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const closePalette = (restoreFocus = true) => {
+    setPaletteOpen(false);
+    if (restoreFocus) {
+      requestAnimationFrame(() => paletteReturnFocusRef.current?.focus());
+    }
+  };
 
   useEffect(() => {
     const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ? "auto"
       : "smooth";
-    window.scrollTo({ top: 0, behavior });
+    if (location.hash) {
+      window.setTimeout(() => {
+        document
+          .getElementById(decodeURIComponent(location.hash.slice(1)))
+          ?.scrollIntoView({ behavior, block: "start" });
+      }, 0);
+    } else {
+      window.scrollTo({ top: 0, behavior });
+    }
     if (previousPath.current !== location.pathname) {
       mainRef.current?.focus({ preventScroll: true });
       previousPath.current = location.pathname;
@@ -247,12 +270,24 @@ function SiteLayout() {
     const openPalette = (event) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        paletteReturnFocusRef.current = document.activeElement;
         setPaletteOpen(true);
       }
     };
     window.addEventListener("keydown", openPalette);
     return () => window.removeEventListener("keydown", openPalette);
   }, []);
+
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key !== "Escape") return;
+      setMobileOpen(false);
+      mobileNavButtonRef.current?.focus();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileOpen]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -272,7 +307,7 @@ function SiteLayout() {
               <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-teal-600/20 bg-teal-500/10 font-mono font-bold text-teal-700 dark:text-teal-300">
                 SK
               </span>
-              <span className="leading-tight">
+              <span className="header-brand-copy leading-tight">
                 <span className="block text-sm font-semibold">Sandip</span>
                 <span className="block font-mono text-[10px] text-slate-500 dark:text-slate-400">
                   SECURITY PORTFOLIO
@@ -281,11 +316,11 @@ function SiteLayout() {
             </Link>
 
             <ul className="hidden flex-1 items-center justify-center gap-1 lg:flex">
-              {links.map(([to, label]) => (
+              {primaryLinks.map(([to, label]) => (
                 <li key={to}>
                   <NavLink
                     to={to}
-                    end={to === "/"}
+                    end={to === "/#about"}
                     className={({ isActive }) =>
                       `relative rounded-lg px-3 py-2 text-[13px] transition ${isActive ? "font-medium text-teal-800 dark:text-teal-200" : "text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"}`
                     }
@@ -308,9 +343,15 @@ function SiteLayout() {
             </ul>
 
             <div className="flex items-center gap-2">
+              <a className="btn btn-solid hidden !min-h-9 !rounded-full !px-4 sm:inline-flex" href="/resume.pdf" download>
+                Resume
+              </a>
               <button
                 className="btn hidden !min-h-9 !rounded-full !px-3 text-xs sm:inline-flex"
-                onClick={() => setPaletteOpen(true)}
+                onClick={(event) => {
+                  paletteReturnFocusRef.current = event.currentTarget;
+                  setPaletteOpen(true);
+                }}
                 aria-label="Open page search"
               >
                 <span>⌕</span>
@@ -321,6 +362,7 @@ function SiteLayout() {
               </button>
               <ThemeToggle />
               <button
+                ref={mobileNavButtonRef}
                 className="btn !min-h-9 !rounded-full !px-3 lg:hidden"
                 aria-expanded={mobileOpen}
                 aria-controls={mobileOpen ? "mobile-navigation" : undefined}
@@ -359,7 +401,8 @@ function SiteLayout() {
                 <button
                   type="button"
                   className="mt-2 w-full rounded-xl px-3 py-2 text-left font-mono text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"
-                  onClick={() => {
+                  onClick={(event) => {
+                    paletteReturnFocusRef.current = event.currentTarget;
                     setMobileOpen(false);
                     setPaletteOpen(true);
                   }}
@@ -403,7 +446,10 @@ function SiteLayout() {
           </div>
         </footer>
         {paletteOpen && (
-          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+          <CommandPalette
+            open={paletteOpen}
+            onClose={closePalette}
+          />
         )}
       </div>
     </MotionConfig>

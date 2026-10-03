@@ -5,6 +5,7 @@
 //    session. If five calls hit 401 together, they must share ONE refresh request.
 let csrfPromise = null;
 let refreshPromise = null;
+const AUTH_REFRESH_LOCK = "portfolio-auth-refresh";
 
 async function raw(path, { method = "GET", body, csrf } = {}) {
   const headers = {};
@@ -68,14 +69,33 @@ export async function request(path, opts = {}, tried = {}) {
   }
 }
 
-const refresh = () =>
-  (refreshPromise ??= request(
+async function refreshWhileHoldingLock() {
+  try {
+    await raw("/auth/me");
+    return;
+  } catch (error) {
+    if (error.status !== 401 || error.code !== "UNAUTHENTICATED") throw error;
+  }
+  await request(
     "/auth/refresh",
     { method: "POST" },
     { refresh: true, csrf: false },
-  ).finally(() => {
+  );
+}
+
+const refresh = () => {
+  if (refreshPromise) return refreshPromise;
+  const operation = async () => {
+    const lockManager = globalThis.navigator?.locks;
+    if (!lockManager?.request)
+      throw new Error("This browser cannot safely coordinate session refresh.");
+    await lockManager.request(AUTH_REFRESH_LOCK, refreshWhileHoldingLock);
+  };
+  refreshPromise = operation().finally(() => {
     refreshPromise = null;
-  }));
+  });
+  return refreshPromise;
+};
 
 export const api = {
   get: (p) => request(p),

@@ -17,10 +17,42 @@ export function useApi(path) {
   return state;
 }
 
-export function usePageTitle(title) {
+export function usePageTitle(
+  title,
+  description = `${title} from Sandip Kepchhaki's security portfolio.`,
+) {
   useEffect(() => {
     document.title = `${title} | Sandip Kepchhaki`;
-  }, [title]);
+    const canonical = document.querySelector('link[rel="canonical"]');
+    const origin = canonical
+      ? new URL(canonical.href).origin
+      : window.location.origin;
+    const url = new URL(window.location.pathname, origin).href;
+    const content = {
+      description,
+      "og:title": document.title,
+      "og:description": description,
+      "og:url": url,
+      "twitter:title": document.title,
+      "twitter:description": description,
+    };
+
+    Object.entries(content).forEach(([key, value]) => {
+      const selector = key.startsWith("og:")
+        ? `meta[property="${key}"]`
+        : `meta[name="${key}"]`;
+      let meta = document.querySelector(selector);
+      if (!meta) {
+        meta = document.createElement("meta");
+        if (key.startsWith("og:")) meta.setAttribute("property", key);
+        else meta.name = key;
+        document.head.appendChild(meta);
+      }
+      meta.content = value;
+    });
+
+    if (canonical) canonical.href = url;
+  }, [title, description]);
 }
 
 export const prefersReducedMotion = () =>

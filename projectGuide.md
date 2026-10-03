@@ -1,6 +1,6 @@
 # Project guide: architecture, development, and cloud operations
 
-This guide describes the current React/Vite and Express application and its target production architecture: Vercel for the SPA, Render for the API and Redis-compatible Key Value, and MongoDB Atlas for persistent application data. For findings and residual risks, see [codereview.md](./codereview.md), [the security checklist](./docs/security-checklist.md), and [the threat model](./docs/threat-model.md).
+This guide describes the current React/Vite and Express application. The frontend and API are deployed separately; the owner manually hosts the API. The live API host, proxy chain, and Redis provider are not established by this repository. For findings and residual risks, see [codereview.md](./codereview.md), [the security checklist](./docs/security-checklist.md), and [the threat model](./docs/threat-model.md).
 
 ## 1. Design principles
 
@@ -17,10 +17,11 @@ This guide describes the current React/Vite and Express application and its targ
 ```text
 client/   React 18 + Vite + Tailwind + Framer Motion + React Router
 server/   Express API, Mongoose models, Redis-compatible services, Jest tests
-render.yaml        Render API and private Key Value Blueprint
 client/vercel.json Vercel SPA/API/sitemap routing and browser security headers
 docs/              Security checklist and threat model
 ```
+
+`docker-compose.yml` and Nginx describe an optional reference stack for local/self-managed use; they do not establish the production topology.
 
 | Concern | Source of truth |
 |---|---|
@@ -34,7 +35,7 @@ docs/              Security checklist and threat model
 | Token, cache, contact, GitHub, and event logic | `server/src/services/` |
 | Persistent schemas, indexes, and retention | `server/src/models/` |
 | Environment validation and infrastructure clients | `server/src/config/` |
-| Cloud service wiring | `render.yaml` and `client/vercel.json` |
+| Frontend rewrites and browser security headers | `client/vercel.json` |
 
 ### Backend boundaries
 
@@ -58,68 +59,63 @@ docs/              Security checklist and threat model
 
 | Setting | Local development | Production |
 |---|---|---|
-| Frontend | Vite dev server, typically `http://localhost:5173` | Vercel project rooted at `client/` |
-| API | Node on `PORT` (default 10000; Compose sets 5000 locally) | Single Render web service using `server/Dockerfile` |
-| MongoDB | Local MongoDB or test double | Atlas least-privilege database user |
-| Redis | Local Redis-compatible service | External Upstash-compatible Redis URL in `REDIS_URL` |
-| Secrets | Ignored local `.env` | Render secret environment variables |
-| Public API path | Vite proxy `/api` | Vercel same-origin rewrite `/api/*` |
+| Frontend | Vite dev server, typically `http://localhost:5173` | Separately deployed SPA (Vercel config is provided) |
+| API | Node on `PORT` (default 10000; Compose sets 5000 locally) | Owner-managed/manual host using `server/Dockerfile` or equivalent |
+| MongoDB | Local MongoDB or test double | Existing MongoDB deployment; preserve the `test` database unless migrated |
+| Redis | Local Redis-compatible service | Owner-selected Redis-compatible service in `REDIS_URL` |
+| Secrets | Ignored local `.env` | Secret environment variables on the API host |
+| Public API path | Vite proxy `/api` | Same-origin frontend proxy `/api/*` to the manually hosted API |
 
-Use `.env.example` as a variable-name reference only. Replace all `change_me...` placeholders. Generate three distinct signing secrets of at least 32 characters. There is no bootstrap CLI or public admin-registration route; configure SMTP for the admin's email-based password recovery. Do not print, commit, email, or paste secrets into tickets or chat.
+Use `.env.example` as a variable-name reference only. Replace all `change_me...` placeholders. Generate three distinct signing secrets of at least 32 characters. There is no bootstrap CLI or public admin-registration route; configure Resend for the admin's email-based password recovery and contact notifications. Do not print, commit, email, or paste secrets into tickets or chat.
 
 The database URI must use the least-privilege application account and identify the intended database. URL-encode URI-reserved password characters. Rotate credentials that have been exposed, and only configure replacement credentials through ignored local files or provider secret stores.
 
-`TRUST_PROXY_HOPS` must match the deployed proxy chain. The API uses a conservative default of one hop and the Blueprint sets one; measure the client IP observed in Render logs and perform a spoof check before changing the value. An overly large value can let a client forge forwarding headers; an overly small value can collapse many visitors onto a proxy address.
+`TRUST_PROXY_HOPS` must match the actual deployed proxy chain. Measure the client IP observed by the API and perform a spoof check before setting it. An overly large value can let a client forge forwarding headers; an overly small value can collapse many visitors onto a proxy address.
 
 ## 4. Development and checks
 
 1. Start local MongoDB and Redis-compatible services. The root Docker Compose file can be used for local testing; it is not the production deployment guide.
 2. Configure ignored local environment variables and use `TRUST_PROXY_HOPS=0` when calling the API directly.
 3. In `server/`, run `npm ci`, `npm test`, `npm run lint`, and `npm run dev`.
-4. In `client/`, run `npm ci`, `npm run build`, and `npm run dev`.
+4. In `client/`, run `npm ci`, `npm test`, `npx playwright install chromium`, `npm run test:e2e`, and `npm run dev`. A production build also requires a public test key locally or the real public Turnstile site key in the deployment environment.
 5. Before a release, test public and admin routes, login/logout/refresh, contact validation and abuse controls, both themes, keyboard/focus behavior, reduced motion, mobile breakpoints, and browser console errors.
 
 Use the smallest relevant test suite during iteration, then run the full API tests/lint and client production build. Configuration changes should also be checked against the provider's current Blueprint/project schema.
 
 ## 5. Cloud deployment
 
-### Vercel
+### Frontend and API
 
-- Create a Vercel project from the repository with **Root Directory** `client` and the Vite framework preset.
-- `client/vercel.json` defines `npm ci`, `npm run build`, `dist`, the SPA fallback, headers, and same-origin rewrites.
-- The API and sitemap rewrites target `my-portfolio-tlnr.onrender.com`. The canonical frontend origin is `https://www.sandipkepchhaki.com.np`; production CORS also allows the existing Vercel frontend aliases.
-- Set the public `VITE_TURNSTILE_SITE_KEY` only when enabling Turnstile. Never put a secret in the frontend environment.
-
-### Render
-
-- Create a Blueprint from `render.yaml`; it provisions one API web service only. Configure Atlas and external Redis through `MONGO_URI` and `REDIS_URL`. The Render readiness check is `/api/health`.
-- Set all `sync: false` values in Render. Required values include `MONGO_URI`, `REDIS_URL`, and the three signing secrets. `CORS_ORIGINS` includes the exact custom-domain and existing Vercel origins; `PUBLIC_SITE_URL` uses the custom domain.
-- The Blueprint uses free plans: Render may sleep the API after inactivity, and free Key Value is ephemeral. Redis restart/eviction clears active sessions and rate-limit counters. Choose paid plans if continuous uptime or persistent Redis state is required.
-- After creating and changing the bootstrap admin password, remove the bootstrap email/password environment variables.
-- Confirm `/api/health` returns 200 only when MongoDB and Redis can be pinged.
+- Configure the frontend host to serve the SPA and proxy `/api/*` plus `/sitemap.xml` to the actual manually hosted API. The checked-in Vercel rewrites target the owner-confirmed origin `https://my-portfolio-tlnr.onrender.com`; recheck them if the backend host changes.
+- Keep browser API calls same-origin; the rewrite preserves the strict-cookie behavior. Set backend `CORS_ORIGINS` to the exact frontend origins.
+- Set the public `VITE_TURNSTILE_SITE_KEY` for production builds and the matching `TURNSTILE_SECRET` on the API host. Configure all live frontend hostnames in the widget.
+- Configure `MONGO_URI`, `REDIS_URL`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `PORT`, and three distinct signing secrets (32+ characters) on the API host. Production startup requires Turnstile configuration.
+- Configure `RESEND_API_KEY` and a verified `RESEND_FROM`; contact notifications default to `sarunmgr77@gmail.com`. MongoDB persistence is independent of email delivery.
+- Confirm `/api/health` returns ready only when MongoDB and Redis can be pinged; `/api/health/live` reports process liveness.
+- Configure and remove any bootstrap credentials according to the API's environment validation. Do not assume a public registration flow exists.
 
 ### MongoDB Atlas
 
 - Create a database user limited to `readWrite` on the application database; never put an Atlas administrator account in `MONGO_URI`.
-- Atlas must permit outbound connections from Render. Prefer private networking or static-egress IP allowlisting where available. A broad IP allowlist increases exposure and must be balanced against Render's outbound-IP plan.
+- Atlas must permit connections from the manually hosted API. Prefer private networking or static-egress IP allowlisting where available. A broad IP allowlist increases exposure.
 - Verify database connectivity only after the URI and Atlas network access have been configured. No live connection is implied by a successful frontend build or local test.
 
 ### Same-origin and proxy validation
 
-The browser must continue to call the Vercel origin. The rewrite keeps strict cookies same-site; direct browser requests to `onrender.com` are not an equivalent setup. Set `CORS_ORIGINS` to the exact Vercel/custom-domain origins. Then inspect Render logs for the API's view of the client address and test that a forged `X-Forwarded-For` is not accepted before adjusting proxy hops.
+The browser must continue to call the frontend origin. The rewrite keeps strict cookies same-site; direct browser requests to a separate API origin are not equivalent. Set `CORS_ORIGINS` to the exact frontend/custom-domain origins. Inspect API logs for the client address and test that forged `X-Forwarded-For` values are not accepted before adjusting proxy hops.
 
 ## 6. Release and operations
 
 - Deploy only after server tests/lint and the client build pass.
 - Confirm the API hostname, API rewrite, sitemap rewrite, custom-domain CORS origin, Turnstile pair, and health endpoints after deployment.
 - Keep MongoDB backups in a protected location and test restoration. The selected Atlas plan's backup capabilities vary; do not assume free-tier backups.
-- Review Render/Vercel deploy logs and security events after release. Avoid exporting contact records or IP-bearing event data to public logs.
+- Review frontend and API deployment logs and security events after release. Avoid exporting contact records or IP-bearing event data to public logs.
 - Rotate the bootstrap account password and provider credentials after compromise or disclosure. Changing JWT/CSRF secrets signs out sessions; Redis restarts may also invalidate them.
 - Update [the threat model](./docs/threat-model.md) when trust boundaries, providers, data types, or integrations change.
 
 ## 7. Deferred controls and limitations
 
 - Admin MFA is not implemented.
-- Free Render plans are not an always-on production SLA; API cold starts affect the first request after inactivity.
-- API rate limits remain active, but Nginx-only scanner filters and connection limits do not carry over to Vercel/Render.
+- Availability, cold starts, and Redis persistence depend on the selected providers and must be checked directly.
+- API rate limits remain active; Nginx-only scanner filters and connection limits apply only if that reference stack is deployed.
 - The sitemap lists published blog posts dynamically, but the client-rendered SPA is not fully server-rendered for search engines.

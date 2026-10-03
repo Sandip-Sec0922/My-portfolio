@@ -3,12 +3,12 @@ import LoadingSkeleton from "../components/LoadingSkeleton.jsx";
 import { useApi, usePageTitle } from "../hooks.js";
 
 const CONTROLS = [
-  ["Reverse proxy", "Nginx serves the static app, forwards API requests, and applies browser security headers."],
+  ["Request routing", "The frontend sends API requests through a same-origin route, keeping browser authentication cookies scoped to the site."],
   ["API validation", "Request schemas, NoSQL sanitization, parameter-pollution protection, and explicit CORS allowlisting."],
   ["Authentication", "Argon2 password hashing, short-lived access tokens, rotating refresh tokens, and CSRF protection."],
-  ["Abuse controls", "Shared Redis-backed rate limits, login lockout, contact honeypot, and optional Turnstile verification."],
+  ["Abuse controls", "IP-based rate limits, per-account-and-IP login backoff, a contact honeypot, and server-verified Turnstile challenges."],
   ["Caching", "Redis cache-aside for public data with invalidation after administrative changes."],
-  ["Network boundaries", "MongoDB and Redis are not published; the data network is internal to the Docker stack."],
+  ["Data protection", "Admin-only access to messages and security events, bounded request sizes, and automatic data-retention limits."],
 ];
 
 const LABEL = {
@@ -25,7 +25,10 @@ const LABEL = {
 };
 
 export default function Security() {
-  usePageTitle("Security Posture");
+  usePageTitle(
+    "Security Posture",
+    "An overview of the security controls and aggregate security-event telemetry used by Sandip Kepchhaki's portfolio.",
+  );
   const { data, loading, error } = useApi("/security/posture");
   const max = data ? Math.max(1, ...data.daily.map((day) => day.total)) : 1;
   return (
@@ -102,9 +105,6 @@ export default function Security() {
                   </div>
                 ))}
               </div>
-              <p className="mt-5 border-t border-slate-200 pt-3 font-mono text-[10px] text-slate-500 dark:border-white/10">
-                Served by replica: {data.servedBy}
-              </p>
             </div>
           </>
         )}

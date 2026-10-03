@@ -5,7 +5,10 @@ import { profile, skills } from "../data/profile.js";
 import { usePageTitle, useTyping } from "../hooks.js";
 
 export default function Home() {
-  usePageTitle("Aspiring SOC Analyst");
+  usePageTitle(
+    "Aspiring SOC Analyst",
+    "Sandip Kepchhaki's cybersecurity portfolio: SOC learning, security projects, threat-intelligence automation, and technical write-ups.",
+  );
   const typed = useTyping(profile.terminal);
   return (
     <div className="space-y-20 sm:space-y-24">

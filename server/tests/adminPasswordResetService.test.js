@@ -52,7 +52,20 @@ const mockRedis = {
 };
 
 jest.mock("../src/config/redis", () => mockRedis);
-jest.mock("../src/models/User", () => ({ findOne: jest.fn() }));
+jest.mock("../src/models/User", () => {
+  const store = { user: null };
+  return {
+    __store: store,
+    findOne: jest.fn(),
+    findByIdAndUpdate: jest.fn((_id, update) => {
+      Object.assign(store.user, update.$set || {});
+      Object.entries(update.$inc || {}).forEach(([key, value]) => {
+        store.user[key] = (store.user[key] || 0) + value;
+      });
+      return Promise.resolve(store.user);
+    }),
+  };
+});
 jest.mock("../src/services/passwordService", () => ({
   hash: jest.fn(async (password) => `hashed:${password}`),
 }));
@@ -80,6 +93,7 @@ const createUser = () => ({
   _id: "admin-id",
   email: "admin@example.com",
   role: "admin",
+  authVersion: 0,
   save: jest.fn().mockResolvedValue(undefined),
 });
 
@@ -92,6 +106,7 @@ beforeEach(() => {
 
 test("sends an OTP only to an existing admin and stores only its digest", async () => {
   const admin = createUser();
+  User.__store.user = admin;
   User.findOne.mockResolvedValue(admin);
 
   await expect(requestCode("ADMIN@example.com")).resolves.toContain(
@@ -145,6 +160,7 @@ test("clears the OTP and cooldown after mail delivery fails", async () => {
 
 test("accepts a code once, updates the password and revokes sessions/unlocks admin", async () => {
   const admin = createUser();
+  User.__store.user = admin;
   User.findOne.mockResolvedValue(admin);
   await requestCode(admin.email);
   const otp = mail.sendAdminPasswordResetOtp.mock.calls[0][1];
@@ -159,7 +175,15 @@ test("accepts a code once, updates the password and revokes sessions/unlocks adm
 
   expect(passwords.hash).toHaveBeenCalledWith("a-new-strong-password");
   expect(admin.passwordHash).toBe("hashed:a-new-strong-password");
-  expect(admin.save).toHaveBeenCalledTimes(1);
+  expect(admin.authVersion).toBe(1);
+  expect(User.findByIdAndUpdate).toHaveBeenCalledWith(
+    "admin-id",
+    {
+      $set: { passwordHash: "hashed:a-new-strong-password" },
+      $inc: { authVersion: 1 },
+    },
+    { new: true },
+  );
   expect(tokens.revokeAllForUser).toHaveBeenCalledWith("admin-id");
   expect(lockout.clear).toHaveBeenCalledWith(admin.email);
   await expect(

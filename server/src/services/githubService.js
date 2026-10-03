@@ -12,7 +12,6 @@ const LOCK_SEC = 30;
 const RELEASE_LOCK =
   "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
 let refreshPromise;
-let githubTokenRejected = false;
 
 async function gh(path) {
   const headers = {
@@ -28,8 +27,7 @@ async function gh(path) {
     signal: AbortSignal.timeout(5000),
   };
   let res = await fetch(url, options);
-  if (res.status === 401 && config.github.token && !githubTokenRejected) {
-    githubTokenRejected = true;
+  if (res.status === 401 && config.github.token) {
     logger.warn({ status: res.status }, "github_token_rejected");
     const publicHeaders = { ...headers };
     delete publicHeaders.Authorization;

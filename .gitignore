@@ -6,5 +6,7 @@ nginx/certs/*
 !nginx/certs/.gitkeep
 dist/
 coverage/
+client/test-results/
+client/playwright-report/
 logs/
 *.log

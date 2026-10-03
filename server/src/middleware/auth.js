@@ -1,6 +1,7 @@
 "use strict";
 const AppError = require("../utils/AppError");
 const tokens = require("../services/tokenService");
+const User = require("../models/User");
 const { logSecurity } = require("../services/securityEventService");
 
 async function authenticate(req, res, next) {
@@ -32,11 +33,26 @@ async function authenticate(req, res, next) {
       logSecurity("auth_denied", req, { reason: "revoked_token" });
       throw new AppError(401, "UNAUTHENTICATED", "Authentication required");
     }
+    let user;
+    try {
+      user = await User.findById(claims.sub).select("authVersion role");
+    } catch {
+      throw new AppError(
+        503,
+        "AUTH_UNAVAILABLE",
+        "Service temporarily unavailable",
+      );
+    }
+    if (!user || (claims.authVersion ?? 0) !== (user.authVersion ?? 0)) {
+      logSecurity("auth_denied", req, { reason: "session_version_mismatch" });
+      throw new AppError(401, "UNAUTHENTICATED", "Authentication required");
+    }
     req.user = {
       id: claims.sub,
-      role: claims.role,
+      role: user.role,
       jti: claims.jti,
       exp: claims.exp,
+      authVersion: user.authVersion ?? 0,
     };
     next();
   } catch (err) {

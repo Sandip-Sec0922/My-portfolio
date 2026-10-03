@@ -279,19 +279,39 @@ export default function AdminApp() {
 
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="login" element={<Login />} />
-        <Route path="reset-password" element={<ResetPassword />} />
-        <Route element={<Guard />}>
-          <Route index element={<Navigate to="/admin/projects" replace />} />
-          <Route path="projects" element={<ProjectsAdmin />} />
-          <Route path="posts" element={<PostsAdmin />} />
-          <Route path="messages" element={<MessagesAdmin />} />
-          <Route path="security" element={<SecurityLog />} />
-          <Route path="account" element={<AccountAdmin />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/admin" replace />} />
-      </Routes>
+      <div className="min-h-screen">
+        <a
+          href="#admin-main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-white focus:px-4 focus:py-3 focus:text-slate-950"
+        >
+          Skip to admin content
+        </a>
+        <main
+          id="admin-main"
+          tabIndex={-1}
+          className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14"
+        >
+          <Routes>
+            <Route path="/admin/login" element={<Login />} />
+            <Route
+              path="/admin/reset-password"
+              element={<ResetPassword />}
+            />
+            <Route element={<Guard />}>
+              <Route
+                path="/admin"
+                element={<Navigate to="/admin/projects" replace />}
+              />
+              <Route path="/admin/projects" element={<ProjectsAdmin />} />
+              <Route path="/admin/posts" element={<PostsAdmin />} />
+              <Route path="/admin/messages" element={<MessagesAdmin />} />
+              <Route path="/admin/security" element={<SecurityLog />} />
+              <Route path="/admin/account" element={<AccountAdmin />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Routes>
+        </main>
+      </div>
     </AuthProvider>
   );
 }

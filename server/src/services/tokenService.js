@@ -21,14 +21,18 @@ async function execChecked(transaction) {
 }
 
 const signAccess = (user) =>
-  jwt.sign({ role: user.role }, accessSecret, {
+  jwt.sign(
+    { role: user.role, authVersion: user.authVersion ?? 0 },
+    accessSecret,
+    {
     algorithm: "HS256",
     subject: String(user._id),
     expiresIn: accessTtl,
     jwtid: randomUUID(),
     issuer,
     audience: "admin",
-  });
+    },
+  );
 
 const verifyAccess = (token, extra = {}) =>
   jwt.verify(token, accessSecret, {
@@ -42,14 +46,18 @@ const verifyAccess = (token, extra = {}) =>
 async function signRefresh(user, authTime) {
   const jti = randomUUID();
   const uid = String(user._id);
-  const token = jwt.sign({ authTime }, refreshSecret, {
-    algorithm: "HS256",
-    subject: uid,
-    expiresIn: refreshTtlSec,
-    jwtid: jti,
-    issuer,
-    audience: "refresh",
-  });
+  const token = jwt.sign(
+    { authTime, authVersion: user.authVersion ?? 0 },
+    refreshSecret,
+    {
+      algorithm: "HS256",
+      subject: uid,
+      expiresIn: refreshTtlSec,
+      jwtid: jti,
+      issuer,
+      audience: "refresh",
+    },
+  );
   try {
     await execChecked(
       redis
@@ -112,7 +120,11 @@ async function consumeRefresh(token) {
     await revokeAllForUser(claims.sub);
     throw new AppError(401, "UNAUTHENTICATED", "Authentication required");
   }
-  return { userId: claims.sub, authTime };
+  return {
+    userId: claims.sub,
+    authTime,
+    authVersion: claims.authVersion ?? 0,
+  };
 }
 
 async function revokeRefresh(token) {

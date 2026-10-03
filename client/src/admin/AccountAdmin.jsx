@@ -12,6 +12,7 @@ export default function AccountAdmin() {
   const [again, setAgain] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   async function submit(ev) {
     ev.preventDefault();
@@ -32,6 +33,18 @@ export default function AccountAdmin() {
       setBusy(false);
     }
     return undefined;
+  }
+
+  async function logoutAll() {
+    setErr("");
+    setLogoutBusy(true);
+    try {
+      await api.post("/auth/logout-all");
+      expire("All sessions were signed out. Sign in again to continue.");
+    } catch (e) {
+      setErr(fail(e));
+      setLogoutBusy(false);
+    }
   }
 
   return (
@@ -94,6 +107,20 @@ export default function AccountAdmin() {
           {err}
         </p>
       </form>
+      <div className="glass mt-4 space-y-3">
+        <h2 className="text-lg">Other sessions</h2>
+        <p className="prose-copy text-sm">
+          Sign out every browser session, including this one.
+        </p>
+        <button
+          type="button"
+          className="btn"
+          onClick={logoutAll}
+          disabled={logoutBusy}
+        >
+          {logoutBusy ? "Signing out…" : "Sign out all sessions"}
+        </button>
+      </div>
     </section>
   );
 }

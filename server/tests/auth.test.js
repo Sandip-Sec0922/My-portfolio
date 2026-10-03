@@ -8,23 +8,38 @@ jest.mock("../src/models/SecurityEvent", () => ({
 }));
 jest.mock("../src/models/User", () => {
   const store = { user: null };
-  const query = () => {
-    const p = Promise.resolve(store.user);
-    p.select = () => Promise.resolve(store.user);
+  const query = (value) => {
+    const p = Promise.resolve(value);
+    p.select = () => Promise.resolve(value);
     return p;
   };
   return {
     __store: store,
-    findOne: jest.fn(query),
-    findById: jest.fn(query),
+    findOne: jest.fn(() => query(store.user)),
+    findById: jest.fn(() => query(store.user)),
+    findByIdAndUpdate: jest.fn((_id, update) => {
+      if (store.user) {
+        Object.assign(store.user, update.$set || {});
+        if (update.$inc)
+          Object.entries(update.$inc).forEach(([key, value]) => {
+            store.user[key] = (store.user[key] || 0) + value;
+          });
+      }
+      return query(store.user);
+    }),
     updateOne: jest.fn(() => Promise.resolve({})),
   };
 });
+jest.mock("../src/services/mailService", () => ({
+  canSendPasswordReset: jest.fn(() => true),
+  sendAdminPasswordResetOtp: jest.fn().mockResolvedValue(undefined),
+}));
 
 const request = require("supertest");
 const redis = require("../src/config/redis");
 const User = require("../src/models/User");
 const passwords = require("../src/services/passwordService");
+const mail = require("../src/services/mailService");
 const { createApp } = require("../src/app");
 
 const EMAIL = "admin@example.com";
@@ -39,11 +54,15 @@ beforeAll(async () => {
     email: EMAIL,
     role: "admin",
     passwordHash: await passwords.hash(PASSWORD),
+    authVersion: 0,
     save: jest.fn(),
   };
 });
 beforeEach(async () => {
   User.__store.user = realUser;
+  realUser.passwordHash = await passwords.hash(PASSWORD);
+  realUser.authVersion = 0;
+  jest.restoreAllMocks();
   await redis.flushall();
 });
 
@@ -137,6 +156,70 @@ describe("login", () => {
     expect((await agent.get("/api/auth/me")).status).toBe(200);
   });
 
+  test("password change invalidates old access and allows a new login", async () => {
+    const agent = request.agent(app);
+    const { token } = await csrf(agent);
+    const loginResult = await login(agent, token);
+    const oldAccess = getCookie(loginResult, "access_token").split(";")[0];
+
+    const changed = await agent
+      .post("/api/auth/change-password")
+      .set("X-CSRF-Token", token)
+      .send({
+        currentPassword: PASSWORD,
+        newPassword: "Different-Long-Password-42",
+      });
+    expect(changed.status).toBe(204);
+    expect(
+      (
+        await request(app)
+          .get("/api/auth/me")
+          .set("Cookie", oldAccess)
+      ).status,
+    ).toBe(401);
+
+    const newSession = request.agent(app);
+    const nextCsrf = await csrf(newSession);
+    expect(
+      (await login(newSession, nextCsrf.token, "Different-Long-Password-42"))
+        .status,
+    ).toBe(200);
+  });
+
+  test("password reset invalidates an already issued access token", async () => {
+    const signedIn = request.agent(app);
+    const signedInCsrf = await csrf(signedIn);
+    const loginResult = await login(signedIn, signedInCsrf.token);
+    const oldAccess = getCookie(loginResult, "access_token").split(";")[0];
+
+    const resetAgent = request.agent(app);
+    const resetCsrf = await csrf(resetAgent);
+    const requested = await resetAgent
+      .post("/api/auth/password-reset/request")
+      .set("X-CSRF-Token", resetCsrf.token)
+      .send({ email: EMAIL });
+    expect(requested.status).toBe(202);
+    const otp = mail.sendAdminPasswordResetOtp.mock.calls.at(-1)[1];
+    jest.spyOn(redis, "eval").mockResolvedValueOnce(1);
+
+    const reset = await resetAgent
+      .post("/api/auth/password-reset/complete")
+      .set("X-CSRF-Token", resetCsrf.token)
+      .send({
+        email: EMAIL,
+        otp,
+        newPassword: "Reset-Long-Password-42",
+      });
+    expect(reset.status).toBe(204);
+    expect(
+      (
+        await request(app)
+          .get("/api/auth/me")
+          .set("Cookie", oldAccess)
+      ).status,
+    ).toBe(401);
+  });
+
   test("blocks NoSQL operator injection", async () => {
     const agent = request.agent(app);
     const { token } = await csrf(agent);
@@ -165,6 +248,23 @@ describe("sessions", () => {
     expect(
       (await agent.post("/api/auth/logout").set("X-CSRF-Token", token)).status,
     ).toBe(204);
+    const replay = await request(app).get("/api/auth/me").set("Cookie", stolen);
+    expect(replay.status).toBe(401);
+  });
+
+  test("logout-all invalidates existing access tokens and clears cookies", async () => {
+    const agent = request.agent(app);
+    const { token } = await csrf(agent);
+    const res = await login(agent, token);
+    const stolen = getCookie(res, "access_token").split(";")[0];
+
+    const loggedOut = await agent
+      .post("/api/auth/logout-all")
+      .set("X-CSRF-Token", token);
+    expect(loggedOut.status).toBe(204);
+    expect(loggedOut.headers["set-cookie"].join(";")).toMatch(
+      /Expires=Thu, 01 Jan 1970/,
+    );
     const replay = await request(app).get("/api/auth/me").set("Cookie", stolen);
     expect(replay.status).toBe(401);
   });

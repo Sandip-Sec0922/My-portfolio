@@ -22,7 +22,13 @@ jest.mock("../src/utils/logger", () => ({
 }));
 
 const logger = require("../src/utils/logger");
+const config = require("../src/config/env");
 const { getGithubData } = require("../src/services/githubService");
+const originalToken = config.github.token;
+
+afterEach(() => {
+  config.github.token = originalToken;
+});
 
 const response = (status, body, headers = {}) => ({
   ok: status >= 200 && status < 300,
@@ -50,6 +56,24 @@ test("retries public GitHub data without a rejected configured token", async () 
   expect(logger.warn).toHaveBeenCalledWith(
     { status: 401 },
     "github_token_rejected",
+  );
+});
+
+test("tries the configured credential again after a later rotation", async () => {
+  config.github.token = "rejected-token";
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce(response(401, { message: "Bad credentials" }))
+    .mockResolvedValueOnce(response(200, []))
+    .mockResolvedValueOnce(response(200, []));
+
+  await expect(getGithubData()).resolves.toMatchObject({ repos: [] });
+  config.github.token = "corrected-token";
+  await expect(getGithubData()).resolves.toMatchObject({ repos: [] });
+
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+  expect(global.fetch.mock.calls[2][1].headers.Authorization).toBe(
+    "Bearer corrected-token",
   );
 });
 

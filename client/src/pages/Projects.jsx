@@ -98,7 +98,10 @@ function GithubPanel() {
 }
 
 export default function Projects() {
-  usePageTitle("Projects");
+  usePageTitle(
+    "Projects",
+    "Security automation, threat-intelligence, and secure-by-design projects by Sandip Kepchhaki.",
+  );
   const [cat, setCat] = useState("all");
   const { data, loading, error } = useApi(
     cat === "all" ? "/projects" : `/projects?category=${cat}`,

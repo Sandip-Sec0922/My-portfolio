@@ -9,6 +9,7 @@ const validEnv = {
   JWT_REFRESH_SECRET: "refresh-secret-unique-01234567890123",
   CSRF_SECRET: "csrf-secret-unique-01234567890123456",
   CORS_ORIGINS: "http://localhost:5173",
+  TURNSTILE_SECRET: "test-turnstile-secret",
   NOTIFY_EMAIL: "",
 };
 
@@ -90,8 +91,17 @@ test("accepts an explicit list of exact HTTPS frontend origins in production", (
       "https://my-portfolio-m3bc-9f23jsctz-sandip-80b8.vercel.app",
     ].join(","),
   });
-
   expect(result.status).toBe(0);
+});
+
+test("requires Turnstile server secret in production", () => {
+  const result = loadEnv({
+    NODE_ENV: "production",
+    TURNSTILE_SECRET: "",
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("TURNSTILE_SECRET");
 });
 
 test("requires Resend API key and sender to be configured together", () => {

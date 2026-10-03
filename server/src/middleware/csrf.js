@@ -25,7 +25,7 @@ function issueToken(res) {
   // httpOnly: the SPA gets the token from the JSON body, so JS never needs to read the cookie.
   res.cookie(COOKIE, token, {
     ...cookieBase(),
-    path: "/",
+    path: "/api",
     maxAge: 2 * 60 * 60 * 1000,
   });
   return token;

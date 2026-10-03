@@ -78,6 +78,14 @@ const schema = z
       });
     }
 
+    if (e.NODE_ENV === "production" && !e.TURNSTILE_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TURNSTILE_SECRET"],
+        message: "Required in production to protect public contact submissions",
+      });
+    }
+
     if (
       new Set([e.JWT_ACCESS_SECRET, e.JWT_REFRESH_SECRET, e.CSRF_SECRET])
         .size !== 3

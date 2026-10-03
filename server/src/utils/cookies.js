@@ -14,7 +14,7 @@ const cookieBase = () => ({
 function setAuthCookies(res, access, refresh) {
   res.cookie("access_token", access, {
     ...cookieBase(),
-    path: "/",
+    path: "/api",
     maxAge: 15 * 60 * 1000,
   });
   // WHY path=/api/auth: the long-lived refresh token is only ever sent to the endpoints that need it.

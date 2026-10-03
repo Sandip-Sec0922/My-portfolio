@@ -8,7 +8,10 @@ import Markdown from "../components/Markdown.jsx";
 const fmt = (date) => (date ? new Date(date).toISOString().slice(0, 10) : "");
 
 export function BlogList() {
-  usePageTitle("Write-ups");
+  usePageTitle(
+    "Security write-ups",
+    "Search and read cybersecurity investigations, technical notes, and lessons from Sandip Kepchhaki.",
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") || "");
   useEffect(() => setQuery(searchParams.get("q") || ""), [searchParams]);
@@ -142,7 +145,10 @@ export function BlogList() {
 export function BlogPost() {
   const { slug } = useParams();
   const { data, loading, error } = useApi(`/posts/${encodeURIComponent(slug)}`);
-  usePageTitle(data?.title || "Write-up");
+  usePageTitle(
+    data?.title || "Write-up",
+    data?.excerpt || "A cybersecurity technical write-up by Sandip Kepchhaki.",
+  );
   if (loading) return <LoadingSkeleton rows={4} className="mx-auto max-w-3xl" />;
   if (error)
     return (

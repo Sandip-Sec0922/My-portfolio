@@ -1,5 +1,4 @@
 "use strict";
-const config = require("../config/env");
 const redis = require("../config/redis");
 const asyncHandler = require("../utils/asyncHandler");
 const cache = require("../services/cacheService");
@@ -41,8 +40,7 @@ async function computePosture() {
 exports.posture = asyncHandler(async (req, res) => {
   const data = await cache.getOrSet("security:posture", 60, computePosture);
   res.set("Cache-Control", "public, max-age=30");
-  // servedBy shows the load balancer rotating replicas. Low-risk info, bounded to this one field.
-  res.json({ ...data, servedBy: config.instanceId });
+  res.json(data);
 });
 
 // ADMIN ONLY: detailed events (includes IPs).

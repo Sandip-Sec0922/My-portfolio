@@ -39,6 +39,7 @@ router.post(
 router.post("/refresh", csrfProtect, refreshLimiter, auth.refresh);
 router.post("/logout", csrfProtect, auth.logout);
 router.get("/me", authenticate, auth.me);
+router.post("/logout-all", authenticate, csrfProtect, auth.logoutAll);
 router.post(
   "/change-password",
   authenticate,

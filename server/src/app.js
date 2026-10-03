@@ -36,7 +36,7 @@ function createApp() {
   app.use(noStore);
 
   app.get("/", health.live);
-  app.get("/api/health", health.ready); // Render's health check must verify dependencies.
+  app.get("/api/health", health.ready); // Readiness must verify dependencies.
   app.get("/api/health/live", health.live);
   app.get("/api/health/ready", health.ready);
 

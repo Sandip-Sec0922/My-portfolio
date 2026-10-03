@@ -130,14 +130,20 @@ async function resetPassword({ email, otp, newPassword }) {
   if (consumed !== 1)
     throw new AppError(400, "INVALID_RESET_CODE", "Invalid or expired reset code");
 
-  user.passwordHash = await passwords.hash(newPassword);
-  await user.save();
+  const passwordHash = await passwords.hash(newPassword);
+  const updated = await User.findByIdAndUpdate(
+    user._id,
+    { $set: { passwordHash }, $inc: { authVersion: 1 } },
+    { new: true },
+  );
+  if (!updated)
+    throw new AppError(400, "INVALID_RESET_CODE", "Invalid or expired reset code");
   await Promise.all([
-    tokens.revokeAllForUser(String(user._id)),
+    tokens.revokeAllForUser(String(updated._id)),
     lockout.clear(user.email),
   ]);
 
-  return user;
+  return updated;
 }
 
 module.exports = { requestCode, resetPassword };

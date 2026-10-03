@@ -4,7 +4,10 @@ import { roadmap } from "../data/lab.js";
 import { usePageTitle } from "../hooks.js";
 
 export default function Roadmap() {
-  usePageTitle("Roadmap");
+  usePageTitle(
+    "Roadmap",
+    "Learning and project roadmap for Sandip Kepchhaki's cybersecurity and SOC journey.",
+  );
   return (
     <section aria-labelledby="rm">
       <div className="page-intro">

@@ -5,6 +5,7 @@ import { usePageTitle } from "../hooks.js";
 import { profile } from "../data/profile.js";
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+const TURNSTILE_REQUIRED = import.meta.env.PROD;
 const empty = { name: "", email: "", subject: "", message: "" };
 let turnstileScriptPromise;
 
@@ -64,7 +65,7 @@ function Turnstile({ onToken, attempt, onRetry }) {
             onToken("");
             setError(
               String(code) === "400020"
-                ? "Cloudflare rejected this site key for this hostname (400020). Check that Vercel's VITE_TURNSTILE_SITE_KEY and Render's TURNSTILE_SECRET belong to the same widget, and allow www.sandipkepchhaki.com.np in that widget's hostnames."
+                ? "Cloudflare rejected this site key for this hostname (400020). Check that the frontend VITE_TURNSTILE_SITE_KEY and backend TURNSTILE_SECRET belong to the same widget, and allow this site's hostname in that widget."
                 : `Cloudflare verification failed (${String(code)}). Check the widget's site key, allowed hostnames, and network access.`,
             );
             return true;
@@ -101,7 +102,10 @@ function Turnstile({ onToken, attempt, onRetry }) {
 }
 
 export default function Contact() {
-  usePageTitle("Contact");
+  usePageTitle(
+    "Contact",
+    "Contact Sandip Kepchhaki about security projects, learning, or collaboration.",
+  );
   const [form, setForm] = useState(empty);
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [token, setToken] = useState("");
@@ -218,11 +222,17 @@ export default function Contact() {
               <label htmlFor="company-website">Leave this field empty</label>
               <input id="company-website" name="companyWebsite" tabIndex={-1} autoComplete="off" value={companyWebsite} onChange={(event) => setCompanyWebsite(event.target.value)} />
             </div>
-            <Turnstile
-              attempt={turnstileAttempt}
-              onToken={onToken}
-              onRetry={() => setTurnstileAttempt((attempt) => attempt + 1)}
-            />
+            {TURNSTILE_REQUIRED && !SITE_KEY ? (
+              <p className="text-sm text-red-700 dark:text-red-300" role="alert">
+                Contact verification is not configured. Please email me directly.
+              </p>
+            ) : (
+              <Turnstile
+                attempt={turnstileAttempt}
+                onToken={onToken}
+                onRetry={() => setTurnstileAttempt((attempt) => attempt + 1)}
+              />
+            )}
             {status.state === "error" && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700 dark:text-red-300" role="alert">
                 {status.message}
@@ -232,7 +242,11 @@ export default function Contact() {
               <p className="text-xs text-slate-500">Protected by abuse prevention controls.</p>
               <button
                 className="btn btn-solid min-w-36"
-                disabled={sending || (Boolean(SITE_KEY) && !token)}
+                disabled={
+                  sending ||
+                  (TURNSTILE_REQUIRED && !SITE_KEY) ||
+                  (Boolean(SITE_KEY) && !token)
+                }
                 aria-busy={sending}
               >
                 {sending ? (

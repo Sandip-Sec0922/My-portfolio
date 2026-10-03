@@ -1,5 +1,6 @@
 # =============================================================================
-# SOC Portfolio - production-oriented stack
+# SOC Portfolio - optional hardened reference stack (local/self-managed only)
+# This configuration is not evidence of the current production topology.
 #
 # Networks (WHY three): limits blast radius. If Nginx is compromised it still
 # cannot talk to MongoDB/Redis. If the data tier is compromised it has no route

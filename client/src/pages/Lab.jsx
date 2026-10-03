@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import StatusBadge from "../components/StatusBadge.jsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.jsx";
@@ -10,7 +10,11 @@ const url = (id) =>
 const fmt = (date) => (date ? new Date(date).toISOString().slice(0, 10) : "");
 
 function Reports() {
-  const { data, loading, error } = useApi("/posts?category=incident-report");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Number(searchParams.get("page")) || 1;
+  const { data, loading, error } = useApi(
+    `/posts?category=incident-report&page=${page}`,
+  );
   if (loading) return <LoadingSkeleton rows={2} />;
   if (error) return <p role="alert">Could not load reports.</p>;
   if (!data.items.length) {
@@ -24,22 +28,66 @@ function Reports() {
     );
   }
   return (
-    <ul className="grid gap-3 sm:grid-cols-2">
-      {data.items.map((post) => (
-        <motion.li key={post._id} className="glass" whileHover={{ y: -3 }}>
-          <Link className="text-lg font-medium accent hover:underline" to={`/blog/${post.slug}`}>
-            {post.title}
-          </Link>
-          <p className="mt-2 font-mono text-[10px] text-slate-500">{fmt(post.publishedAt)}</p>
-          <p className="prose-copy mt-2 text-sm">{post.excerpt}</p>
-        </motion.li>
-      ))}
-    </ul>
+    <>
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {data.items.map((post) => (
+          <motion.li key={post._id} className="glass" whileHover={{ y: -3 }}>
+            <Link
+              className="text-lg font-medium accent hover:underline"
+              to={`/blog/${post.slug}`}
+            >
+              {post.title}
+            </Link>
+            <p className="mt-2 font-mono text-[10px] text-slate-500">
+              {fmt(post.publishedAt)}
+            </p>
+            <p className="prose-copy mt-2 text-sm">{post.excerpt}</p>
+          </motion.li>
+        ))}
+      </ul>
+      {data.pages > 1 && (
+        <nav
+          aria-label="Incident report pages"
+          className="mt-6 flex items-center justify-center gap-4"
+        >
+          <button
+            className="btn btn-sm"
+            disabled={data.page <= 1}
+            onClick={() =>
+              setSearchParams({
+                ...Object.fromEntries(searchParams),
+                page: String(data.page - 1),
+              })
+            }
+          >
+            ← Previous
+          </button>
+          <span className="font-mono text-xs text-slate-500">
+            Page {data.page} of {data.pages}
+          </span>
+          <button
+            className="btn btn-sm"
+            disabled={data.page >= data.pages}
+            onClick={() =>
+              setSearchParams({
+                ...Object.fromEntries(searchParams),
+                page: String(data.page + 1),
+              })
+            }
+          >
+            Next →
+          </button>
+        </nav>
+      )}
+    </>
   );
 }
 
 export default function Lab() {
-  usePageTitle("Home Lab");
+  usePageTitle(
+    "Home Lab",
+    "SOC workflows, detection engineering plans, and incident-report write-ups from Sandip Kepchhaki's home lab.",
+  );
   const built = detections.filter((detection) => detection.status === "built").length;
   const planned = detections.length - built;
   return (
@@ -123,6 +171,12 @@ export default function Lab() {
         <div className="mb-5">
           <p className="eyebrow">Investigation notes</p>
           <h2 id="ir" className="section-title mt-2">Incident-report write-ups</h2>
+          <Link
+            className="mt-3 inline-flex font-mono text-xs accent hover:underline"
+            to="/blog?category=incident-report"
+          >
+            View all incident reports →
+          </Link>
         </div>
         <Reports />
       </section>

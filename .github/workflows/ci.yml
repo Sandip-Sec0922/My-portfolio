@@ -43,9 +43,9 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   client:
-    name: Client (build, audit)
+    name: Client (unit, E2E, build, audit)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: client
@@ -65,7 +65,15 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
+      - name: Unit tests
+        run: npm test
+      - name: Install browser for E2E tests
+        run: npx playwright install --with-deps chromium
+      - name: Browser E2E tests
+        run: npm run test:e2e
       - name: Production build
         run: npm run build
+        env:
+          VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       - name: Dependency audit (production deps, fail on high/critical)
         run: npm audit --omit=dev --audit-level=high

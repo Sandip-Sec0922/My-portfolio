@@ -32,6 +32,6 @@ exports.create = asyncHandler(async (req, res) => {
   });
   mail
     .notifyNewMessage(msg)
-    .catch((err) => logger.warn({ err: err.message }, "notify_email_failed")); // never block the visitor on SMTP
+    .catch((err) => logger.warn({ err: err.message }, "notify_email_failed")); // Persisted messages survive email-provider failures.
   res.status(201).json({ ok: true });
 });

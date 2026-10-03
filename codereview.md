@@ -2,7 +2,7 @@
 
 **Scope:** the existing React/Vite/Tailwind/Framer Motion application, Express API, authentication, contact flow, integrations, deployment configuration, CI, and supplied documentation.
 
-**Architecture:** Vercel frontend, Render API and Redis-compatible Key Value, MongoDB Atlas. Docker Compose/Nginx is retained for local use only; it is not the production topology described by the deployment docs.
+**Architecture:** separately deployed frontend and owner-managed/manual Express API. The live API host, proxy chain, and Redis provider are not established by this repository. Docker Compose/Nginx is an optional reference stack, not evidence of production infrastructure.
 
 ## Verified fixes
 
@@ -36,20 +36,22 @@
 
 ## Additional review notes
 
-- `/api/health` now checks live MongoDB and Redis connectivity for Render; `/api/health/live` reports process liveness.
+- `/api/health` checks live MongoDB and Redis connectivity; `/api/health/live` reports process liveness.
 - Atlas contact-message persistence is present, but a live connection must be confirmed after deployment configuration.
-- `render.yaml` defines free Render plans. Expect API cold starts and ephemeral Key Value state; Redis restarts can invalidate sessions and counters.
-- `client/vercel.json` targets the live API at `my-portfolio-tlnr.onrender.com`. The canonical frontend origin is `https://www.sandipkepchhaki.com.np`; the Render CORS allowlist includes the custom domain and existing Vercel aliases.
-- The Atlas password previously shared in conversation must be rotated before production use. Never repeat it in logs, docs, or commits.
-- The actual Render service, Atlas network access, Vercel project root, production rewrite, proxy-hop count, and CORS origins have not been live-validated by this code review.
+- `client/vercel.json` targets the owner-confirmed API origin `https://my-portfolio-tlnr.onrender.com`. Health, proxy-hop count, CORS, and database connectivity still require live verification.
+- Production Turnstile is mandatory in code, but its production site/secret key pair and allowed hostnames require operator configuration.
+- The current MongoDB database selection is `test`; preserve it unless a migration is explicitly planned and verified.
+- Rotate any credential exposed outside its secret store. Never repeat it in logs, docs, or commits.
+- The actual API host, Atlas network access, frontend project root, production rewrite, proxy-hop count, CORS origins, and production secrets have not been live-validated by this code review.
 
 ## Residual risks
 
 1. Admin MFA is not implemented.
-2. Free Render services can cold-start and Key Value data is not durable.
-3. Atlas may need a broad IP allowlist when Render egress is not static; private networking/static egress is preferred.
-4. Proxy hops and client-IP spoof resistance must be verified against the deployed provider chain.
+2. API availability and Redis durability/restart behavior depend on the manually selected providers and remain unverified.
+3. MongoDB may need a broad IP allowlist when backend egress is not static; private networking/static egress is preferred.
+4. Proxy hops and client-IP spoof resistance must be verified against the actual deployed chain.
 5. CI actions are version-tag pinned rather than immutable commit-SHA pinned.
 6. The client-rendered SPA is not fully server-rendered for search engines.
+7. `npm audit --omit=dev` reports two moderate React Router advisories; the available automatic fix requires a major-version upgrade, so the dependency was not changed without migration review.
 
 See [the security checklist](./docs/security-checklist.md) for deployment verification and [the threat model](./docs/threat-model.md) for risk ownership.

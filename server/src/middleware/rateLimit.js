@@ -3,10 +3,11 @@ const { rateLimit } = require("express-rate-limit");
 const { RedisStore } = require("rate-limit-redis");
 const redis = require("../config/redis");
 const config = require("../config/env");
+const logger = require("../utils/logger");
 const { logSecurity } = require("../services/securityEventService");
+const AppError = require("../utils/AppError");
 
-// WHY a Redis store: with 3 API replicas an in-memory counter lets an attacker get 3x the budget.
-// Shared state makes the limit global. Tests use the in-memory store and skip limiting.
+// Shared Redis state keeps limits consistent across processes. Sensitive limiters fail closed.
 function make(name, options) {
   return rateLimit({
     standardHeaders: "draft-7",
@@ -14,7 +15,21 @@ function make(name, options) {
     store: config.isTest
       ? undefined
       : new RedisStore({
-          sendCommand: (...args) => redis.call(...args),
+          sendCommand: async (...args) => {
+            try {
+              return await redis.call(...args);
+            } catch (err) {
+              logger.error(
+                { limiter: name, err: err.message },
+                "rate_limit_store_failed",
+              );
+              throw new AppError(
+                503,
+                "RATE_LIMIT_UNAVAILABLE",
+                "Request protection is temporarily unavailable",
+              );
+            }
+          },
           prefix: `rl:${name}:`,
         }),
     skip: () => config.isTest,
@@ -35,7 +50,7 @@ function make(name, options) {
 }
 
 module.exports = {
-  // Fails OPEN if Redis is down so the public site stays up (Nginx still rate-limits upstream).
+  // Public reads remain available during a Redis outage. Sensitive endpoint limiters below fail closed.
   globalLimiter: make("global", {
     windowMs: 15 * 60 * 1000,
     limit: 300,

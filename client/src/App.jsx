@@ -12,14 +12,8 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import Lab from "./pages/Lab.jsx";
-import Roadmap from "./pages/Roadmap.jsx";
 import { profile } from "./data/profile.js";
 import Home from "./pages/Home.jsx";
-import Projects from "./pages/Projects.jsx";
-import { BlogList, BlogPost } from "./pages/Blog.jsx";
-import Contact from "./pages/Contact.jsx";
-import Security from "./pages/Security.jsx";
 
 const links = [
   ["/", "Home"],
@@ -31,6 +25,17 @@ const links = [
   ["/contact", "Contact"],
 ];
 const AdminApp = lazy(() => import("./admin/AdminApp.jsx"));
+const Projects = lazy(() => import("./pages/Projects.jsx"));
+const Lab = lazy(() => import("./pages/Lab.jsx"));
+const Roadmap = lazy(() => import("./pages/Roadmap.jsx"));
+const BlogList = lazy(() =>
+  import("./pages/Blog.jsx").then((module) => ({ default: module.BlogList })),
+);
+const BlogPost = lazy(() =>
+  import("./pages/Blog.jsx").then((module) => ({ default: module.BlogPost })),
+);
+const Security = lazy(() => import("./pages/Security.jsx"));
+const Contact = lazy(() => import("./pages/Contact.jsx"));
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() =>
@@ -195,25 +200,25 @@ function PageRoutes() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
     >
-      <Routes location={location}>
-        <Route path="/" element={<Home />} />
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/blog" element={<BlogList />} />
-        <Route path="/blog/:slug" element={<BlogPost />} />
-        <Route path="/security" element={<Security />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/lab" element={<Lab />} />
-        <Route path="/roadmap" element={<Roadmap />} />
-        <Route
-          path="/admin/*"
-          element={
-            <Suspense fallback={<div className="glass animate-pulse">Loading admin workspace…</div>}>
-              <AdminApp />
-            </Suspense>
-          }
-        />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense
+        fallback={
+          <div className="glass animate-pulse" role="status">
+            Loading page…
+          </div>
+        }
+      >
+        <Routes location={location}>
+          <Route path="/" element={<Home />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/blog" element={<BlogList />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
+          <Route path="/security" element={<Security />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/lab" element={<Lab />} />
+          <Route path="/roadmap" element={<Roadmap />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </motion.div>
   );
 }
@@ -406,5 +411,19 @@ function SiteLayout() {
 }
 
 export default function App() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/admin")) {
+    return (
+      <Suspense
+        fallback={
+          <main className="mx-auto max-w-6xl px-4 py-10" role="status">
+            Loading admin workspace…
+          </main>
+        }
+      >
+        <AdminApp />
+      </Suspense>
+    );
+  }
   return <SiteLayout />;
 }

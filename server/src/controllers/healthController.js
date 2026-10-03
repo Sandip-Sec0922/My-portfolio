@@ -1,12 +1,10 @@
 "use strict";
 const mongoose = require("mongoose");
 const redis = require("../config/redis");
-const config = require("../config/env");
 const logger = require("../utils/logger");
 
 // Liveness only reports whether this process can serve requests.
-exports.live = (req, res) =>
-  res.json({ status: "ok", instance: config.instanceId });
+exports.live = (req, res) => res.json({ status: "ok" });
 
 // Readiness must verify actual database connectivity, not just client connection state.
 exports.ready = async (req, res) => {
